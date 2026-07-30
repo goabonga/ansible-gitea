@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "git_head": "3e2fafb02d245d2baaa7c1486a4c61af4e2cbf45",
+  "git_head_short": "3e2fafb",
+  "timestamp": "2026-07-30T14:39:07Z",
+  "components": {
+    "ansible-gitea": {
+      "version": "0.1.0",
+      "tag": "v0.1.0",
+      "tag_sha": null
+    }
+  }
+}

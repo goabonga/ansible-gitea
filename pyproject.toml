@@ -9,7 +9,7 @@
 
 [project]
 name = "ansible-gitea"
-version = "0.0.0"
+version = "0.1.0"
 description = "Ansible project deploying a local Gitea lab on KVM/QEMU with Gitea Actions runners."
 readme = "README.md"
 requires-python = ">=3.11"
