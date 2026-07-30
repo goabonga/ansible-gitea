@@ -1,10 +1,12 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Chris <goabonga@pm.me>
 
-# The lab's internal services. They run on the Gitea guest — daemons that sit
-# idle most of the time, on ports nothing else uses.
+# The lab's internal services: a certificate authority (step-ca) and a resolver
+# for the lab domain (dnsmasq). Both run on the Gitea guest — two mostly idle
+# daemons on ports nothing else uses (9000 and 53).
 #
-# Skipped entirely unless `lab_services_enabled` is true.
+# Skipped entirely unless `lab_services_enabled` is true. It runs before
+# playbooks/gitea.yml because that is where Gitea's certificate comes from.
 ---
 
 - name: Deploy the internal services
@@ -21,6 +23,13 @@
         - name: Gather the guest facts
           ansible.builtin.setup:
 
+        - name: Run the certificate authority
+          ansible.builtin.include_role:
+            name: step_ca
+          when: lab_step_ca_enabled | bool
+          tags:
+            - step_ca
+
         - name: Run the internal resolver
           ansible.builtin.include_role:
             name: internal_dns
@@ -28,7 +37,7 @@
           tags:
             - dnsmasq
 
-- name: Point the guests at the internal resolver
+- name: Point the guests at the internal resolver and CA
   hosts: lab
   become: true
   gather_facts: false
@@ -46,7 +55,14 @@
           tags:
             - dnsmasq
 
-# The whole point of the internal domain: reaching the lab by name from the
+        - name: Trust the internal certificate authority
+          ansible.builtin.include_role:
+            name: internal_ca_trust
+          when: lab_step_ca_enabled | bool
+          tags:
+            - step_ca
+
+# The whole point of the stack: reaching https://gitea.internal from the
 # workstation's own browser and git client.
 - name: Point the workstation at the lab
   hosts: kvm_hosts
@@ -56,8 +72,8 @@
       when:
         - lab_services_enabled | bool
         - lab_configure_workstation | bool
-      # The resolver drop-in lives under /etc, so the whole block runs
-      # privileged.
+      # The resolver drop-in and the trust store both live under /etc, so the
+      # whole block runs privileged.
       become: true
       block:
         - name: Resolve the lab domain
@@ -67,7 +83,19 @@
           tags:
             - dnsmasq
 
+        - name: Trust the internal certificate authority
+          ansible.builtin.include_role:
+            name: internal_ca_trust
+          when: lab_step_ca_enabled | bool
+          tags:
+            - step_ca
+
         - name: Show what the workstation can now reach
           ansible.builtin.debug:
             msg:
               - "{{ lab_gitea_fqdn }} resolves through {{ hostvars[lab_services_host].vm_ip }}"
+              - "The internal root certificate is trusted system-wide."
+              - >-
+                Firefox and Chrome keep their own stores: import
+                {{ lab_state_dir }}/root_ca.crt there, or set
+                security.enterprise_roots.enabled=true in Firefox.

@@ -14,7 +14,13 @@ RUN_MODE = {{ gitea_run_mode }}
 WORK_PATH = {{ gitea_work_dir }}
 
 [server]
+{% if gitea_tls_enabled %}
+PROTOCOL = https
+CERT_FILE = {{ gitea_tls_cert }}
+KEY_FILE = {{ gitea_tls_key }}
+{% else %}
 PROTOCOL = http
+{% endif %}
 DOMAIN = {{ gitea_domain }}
 HTTP_ADDR = {{ gitea_http_addr }}
 HTTP_PORT = {{ gitea_http_port }}

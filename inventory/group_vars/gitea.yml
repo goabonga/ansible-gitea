@@ -8,9 +8,21 @@
 ---
 
 gitea_version: "1.27.1"
-gitea_http_port: 3000
-gitea_domain: "{{ vm_ip }}"
-gitea_root_url: "http://{{ gitea_domain }}:{{ gitea_http_port }}/"
+
+# With the optional services stack on, Gitea moves behind the internal CA:
+# https://gitea.internal on 443. Without it, plain http on 3000 against the
+# guest's address.
+gitea_tls_enabled: "{{ lab_step_ca_enabled | bool }}"
+gitea_http_port: "{{ 443 if gitea_tls_enabled | bool else 3000 }}"
+gitea_domain: "{{ lab_gitea_fqdn if gitea_tls_enabled | bool else vm_ip }}"
+gitea_root_url: >-
+  {{ 'https' if gitea_tls_enabled | bool else 'http' }}://{{ gitea_domain
+  }}{{ '' if gitea_http_port | int == 443 else ':' ~ gitea_http_port }}/
+# Declared here rather than only as a role default, so playbooks/gitea.yml can
+# bake the same list into the certificate token it mints on the CA guest.
+gitea_tls_sans:
+  - "{{ lab_gitea_fqdn }}"
+  - 127.0.0.1
 
 # Gitea's built-in SSH server, kept off 22 so it does not clash with sshd.
 gitea_ssh_port: 2222
@@ -20,9 +32,6 @@ gitea_admin_email: "gitea-admin@{{ lab_network_domain }}"
 gitea_db_password: "GiteaLabDb#2026"
 gitea_disable_registration: true
 gitea_actions_enabled: true
-# Declared here (and not only as a role default) so `playbooks/runners.yml`
-# can read the path out of hostvars when it fetches the token.
-gitea_runner_token_file: /var/lib/gitea/runner-registration-token
 
 # Organisations created on first deployment. Repositories under an
 # organisation get their own Actions secrets and runner scope, which is the
@@ -32,10 +41,21 @@ gitea_organizations:
     full_name: Lab
     description: "Working area for the local lab"
     visibility: private
+# Declared here (and not only as a role default) so `playbooks/runners.yml`
+# can read the path out of hostvars when it fetches the token.
+gitea_runner_token_file: /var/lib/gitea/runner-registration-token
 
 # --- The internal services this guest also hosts --------------------------
+# step-ca signs certificates for the whole `.internal` domain; it answers on
+# :9000, well clear of Gitea's ports.
+step_ca_dns_names:
+  - "{{ lab_ca_fqdn }}"
+  - "{{ vm_ip }}"
+
 # dnsmasq answers for the lab and forwards everything else to libvirt's own
 # resolver on the gateway.
 internal_dns_records:
   - name: "{{ lab_gitea_fqdn }}"
+    ip: "{{ vm_ip }}"
+  - name: "{{ lab_ca_fqdn }}"
     ip: "{{ vm_ip }}"

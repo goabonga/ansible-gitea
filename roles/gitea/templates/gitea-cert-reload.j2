@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+#
+# Managed by Ansible (roles/gitea) - local edits are overwritten.
+#
+# Run by `step ca renew --exec`, i.e. only when a certificate was actually
+# renewed. step writes the new files as root/0600, so the group read that
+# Gitea needs has to be restored before the service comes back.
+
+set -euo pipefail
+
+chown root:{{ gitea_group }} {{ gitea_tls_cert }} {{ gitea_tls_key }}
+chmod 0640 {{ gitea_tls_cert }} {{ gitea_tls_key }}
+systemctl try-restart gitea.service

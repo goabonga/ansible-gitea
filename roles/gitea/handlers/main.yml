@@ -7,3 +7,9 @@
     name: gitea
     state: restarted
     daemon_reload: true
+
+- name: Restart the certificate renewal timer
+  ansible.builtin.systemd_service:
+    name: "{{ gitea_tls_renew_unit }}.timer"
+    state: restarted
+    daemon_reload: true

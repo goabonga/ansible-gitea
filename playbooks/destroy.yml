@@ -35,8 +35,8 @@
         uri: "{{ lab_libvirt_uri }}"
       when: lab_destroy_network | default(false) | bool
 
-# The internal domain reaches into the workstation's resolver, so a teardown
-# has to put it back.
+# The optional stack reaches into the workstation (resolver and trust store),
+# so a teardown has to put both back.
 - name: Undo the workstation changes
   hosts: kvm_hosts
   gather_facts: false
@@ -48,18 +48,37 @@
         state: absent
       notify: Restart systemd-resolved
 
+    # Removing the source file is not enough: the certificate is also symlinked
+    # into /etc/ssl/certs and hashed into the bundle, which the handler's
+    # `update-ca-certificates --fresh` rebuilds from scratch.
+    - name: Stop trusting the internal certificate authority
+      become: true
+      ansible.builtin.file:
+        path: "{{ lab_ca_trust_file }}"
+        state: absent
+      notify: Update the CA trust store
+
+    - name: Remove the fetched CA material
+      ansible.builtin.file:
+        path: "{{ lab_state_dir }}/root_ca.crt"
+        state: absent
+
     - name: Apply the pending workstation cleanup
       ansible.builtin.meta: flush_handlers
 
     - name: Confirm what was left alone
       ansible.builtin.debug:
         msg:
-          - "Removed: {{ lab_resolver_dropin }}."
+          - "Removed: {{ lab_resolver_dropin }}, {{ lab_ca_trust_file }} (trust store rebuilt)."
+          - "Removed: {{ lab_state_dir }}/root_ca.crt and the VPN profiles."
           - >-
             Kept on purpose: the lab SSH keypair
             ({{ lab_ssh_key_path }}), the base cloud image in
             {{ lab_libvirt_images_dir }}, and the libvirt network
             ({{ lab_network_name }}) unless -e lab_destroy_network=true.
+          - >-
+            Not ours to remove: a copy of the root certificate you imported
+            into a browser's own store by hand.
 
   handlers:
     - name: Restart systemd-resolved
@@ -67,3 +86,9 @@
       ansible.builtin.systemd_service:
         name: systemd-resolved
         state: restarted
+
+    - name: Update the CA trust store
+      become: true
+      ansible.builtin.command:
+        cmd: update-ca-certificates --fresh
+      changed_when: true

@@ -1,0 +1,18 @@
+; SPDX-License-Identifier: MIT
+; Copyright (c) 2026 Chris <goabonga@pm.me>
+;
+; Managed by Ansible (roles/gitea) - local edits are overwritten.
+[Unit]
+Description=Renew the Gitea server certificate
+Documentation=https://smallstep.com/docs/step-cli/reference/ca/renew
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+; --exec only fires when a renewal actually happened, so Gitea is left alone
+; on the runs where the certificate is still fresh enough.
+ExecStart=/usr/bin/step ca renew --force \
+    --expires-in {{ gitea_tls_renew_expires_in }} \
+    --exec {{ gitea_tls_reload_script }} \
+    {{ gitea_tls_cert }} {{ gitea_tls_key }}

@@ -1,0 +1,16 @@
+; SPDX-License-Identifier: MIT
+; Copyright (c) 2026 Chris <goabonga@pm.me>
+;
+; Managed by Ansible (roles/gitea) - local edits are overwritten.
+[Unit]
+Description=Renew the Gitea server certificate periodically
+
+[Timer]
+OnCalendar={{ gitea_tls_renew_calendar }}
+; A guest that was shut down past the renewal window catches up on boot.
+Persistent=true
+RandomizedDelaySec=60
+Unit={{ gitea_tls_renew_unit }}.service
+
+[Install]
+WantedBy=timers.target

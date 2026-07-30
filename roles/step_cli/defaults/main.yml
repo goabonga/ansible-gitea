@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+---
+
+# Smallstep CLI. Installed from the upstream .deb, verified against the
+# `checksums.txt` published next to it. Shared by the CA guest (which uses it
+# to initialise and inspect the CA) and by every guest that needs a
+# certificate.
+step_cli_version: "0.30.6"
+step_cli_arch: amd64
+step_cli_release_base: https://github.com/smallstep/cli/releases/download
+step_cli_package: "step-cli_{{ step_cli_version }}-1_{{ step_cli_arch }}.deb"
+step_cli_download_url: "{{ step_cli_release_base }}/v{{ step_cli_version }}/{{ step_cli_package }}"
+step_cli_checksum: "sha256:{{ step_cli_release_base }}/v{{ step_cli_version }}/checksums.txt"
+step_cli_download_dir: /var/cache/ansible-gitea

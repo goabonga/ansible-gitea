@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+---
+
+# The root certificate fetched from the CA guest by the step_ca role. It is a
+# public certificate, not a secret; the root key never leaves the CA.
+internal_ca_trust_source: "{{ lab_state_dir }}/root_ca.crt"
+# Same path playbooks/destroy.yml removes; see lab_ca_trust_file.
+internal_ca_trust_dest: "{{ lab_ca_trust_file }}"
