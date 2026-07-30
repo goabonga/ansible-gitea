@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+---
+
+internal_resolver_domain: "{{ lab_internal_domain | default('internal') }}"
+internal_resolver_address: "{{ hostvars[lab_services_host].vm_ip }}"
+# Same path playbooks/destroy.yml removes; see lab_resolver_dropin.
+internal_resolver_dropin: "{{ lab_resolver_dropin }}"
+internal_resolver_dropin_dir: "{{ internal_resolver_dropin | dirname }}"
+
+# Name used to verify that resolution actually works after the change.
+internal_resolver_probe: "{{ lab_gitea_fqdn | default('gitea.' ~ internal_resolver_domain) }}"

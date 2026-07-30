@@ -1,0 +1,63 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+
+# Routes `*.internal` queries to the lab's dnsmasq through a systemd-resolved
+# drop-in. Only that domain is redirected, so the machine's normal DNS keeps
+# working. Applied to the guests and, optionally, to the workstation.
+---
+
+- name: Collect the service facts
+  ansible.builtin.service_facts:
+
+- name: Note whether systemd-resolved manages this host
+  ansible.builtin.set_fact:
+    internal_resolver_active: >-
+      {{ (ansible_facts.services['systemd-resolved.service'].state | default('')) == 'running' }}
+
+- name: Explain what to do without systemd-resolved
+  ansible.builtin.debug:
+    msg: >-
+      systemd-resolved is not active here, so `{{ internal_resolver_domain }}`
+      cannot be wired up automatically. Point this host's resolver at
+      {{ internal_resolver_address }}, or add
+      "{{ internal_resolver_address }} {{ internal_resolver_probe }}" to
+      /etc/hosts.
+  when: not internal_resolver_active | bool
+
+- name: Configure the internal domain
+  when: internal_resolver_active | bool
+  block:
+    - name: Create the resolved drop-in directory
+      ansible.builtin.file:
+        path: "{{ internal_resolver_dropin_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Route the lab domain to the internal resolver
+      ansible.builtin.template:
+        src: lab-internal.conf.j2
+        dest: "{{ internal_resolver_dropin }}"
+        owner: root
+        group: root
+        mode: "0644"
+      register: internal_resolver_dropin_state
+
+    # Restarted inline rather than through a handler: this role is included
+    # mid-play, where `meta: flush_handlers` would also fire the surrounding
+    # role's pending notifications. The probe below needs the new
+    # configuration to be live already.
+    - name: Apply the resolver configuration
+      ansible.builtin.systemd_service:
+        name: systemd-resolved
+        state: "{{ 'restarted' if internal_resolver_dropin_state is changed else 'started' }}"
+
+    - name: Check that the lab domain resolves
+      ansible.builtin.command:
+        cmd: "getent hosts {{ internal_resolver_probe }}"
+      register: internal_resolver_probe_result
+      changed_when: false
+      until: internal_resolver_probe_result.rc == 0
+      retries: 6
+      delay: 5

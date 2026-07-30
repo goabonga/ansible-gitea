@@ -27,3 +27,47 @@
           when: lab_dnsmasq_enabled | bool
           tags:
             - dnsmasq
+
+- name: Point the guests at the internal resolver
+  hosts: lab
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Wire the guest into the internal domain
+      when: lab_services_enabled | bool
+      block:
+        - name: Gather the guest facts
+          ansible.builtin.setup:
+
+        - name: Resolve the lab domain
+          ansible.builtin.include_role:
+            name: internal_resolver
+          when: lab_dnsmasq_enabled | bool
+          tags:
+            - dnsmasq
+
+# The whole point of the internal domain: reaching the lab by name from the
+# workstation's own browser and git client.
+- name: Point the workstation at the lab
+  hosts: kvm_hosts
+  gather_facts: false
+  tasks:
+    - name: Wire the workstation into the internal domain
+      when:
+        - lab_services_enabled | bool
+        - lab_configure_workstation | bool
+      # The resolver drop-in lives under /etc, so the whole block runs
+      # privileged.
+      become: true
+      block:
+        - name: Resolve the lab domain
+          ansible.builtin.include_role:
+            name: internal_resolver
+          when: lab_dnsmasq_enabled | bool
+          tags:
+            - dnsmasq
+
+        - name: Show what the workstation can now reach
+          ansible.builtin.debug:
+            msg:
+              - "{{ lab_gitea_fqdn }} resolves through {{ hostvars[lab_services_host].vm_ip }}"
