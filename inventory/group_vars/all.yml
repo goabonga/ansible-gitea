@@ -39,28 +39,36 @@ lab_timezone: Etc/UTC
 lab_gitea_host: gitea-server
 
 # --- Internal domain ------------------------------------------------------
-# Serves `*.internal` from a dnsmasq running on the Gitea guest, so the lab is
-# reachable by name instead of by address.
+# Runs an internal CA (step-ca) and a resolver (dnsmasq) so Gitea answers on
+# https://gitea.internal instead of http://<ip>:3000. Both daemons live on the
+# Gitea guest: they are idle most of the time and do not warrant a guest of
+# their own.
 #
-# Set this to false for a plain address-based lab; everything below then turns
-# itself off and playbooks/services.yml becomes a no-op.
+# Set this to false for a plain http lab; everything below then turns itself
+# off and playbooks/services.yml becomes a no-op.
 lab_services_enabled: true
-# Where the internal services run. Every reference goes through this, so
+# Where the CA and the resolver run. Every reference goes through this, so
 # moving them to a dedicated guest later is a one-line change.
 lab_services_host: "{{ lab_gitea_host }}"
 
+# Each piece can be turned off on its own.
+lab_step_ca_enabled: "{{ lab_services_enabled | bool }}"
 lab_dnsmasq_enabled: "{{ lab_services_enabled | bool }}"
 
 # `.internal` is reserved by ICANN for private use, so it can never collide
 # with a real domain.
 lab_internal_domain: internal
 lab_gitea_fqdn: "gitea.{{ lab_internal_domain }}"
+lab_ca_fqdn: "ca.{{ lab_internal_domain }}"
 
-# Point the workstation's resolver at the lab for `*.internal`, so the browser
-# and git reach the guests by name. Reverted by playbooks/destroy.yml.
+# Point the workstation's resolver at the lab for `*.internal` and trust the
+# internal CA there, so the browser reaches https://gitea.internal without a
+# warning. Both changes are reverted by playbooks/destroy.yml.
 lab_configure_workstation: true
 
-# The file the lab writes outside its own guests. It lives here, at inventory
-# level, so the role that creates it and the teardown that removes it cannot
-# drift apart: a role default would be invisible to playbooks/destroy.yml.
+# The two files the lab writes outside its own guests. They live here, at
+# inventory level, so the roles that create them and the teardown that removes
+# them cannot drift apart: a role default would be invisible to
+# playbooks/destroy.yml.
 lab_resolver_dropin: /etc/systemd/resolved.conf.d/lab-internal.conf
+lab_ca_trust_file: /usr/local/share/ca-certificates/lab-internal-root.crt

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Chris <goabonga@pm.me>
 
-# Full lab, from a bare workstation to running guests:
+# Full lab, from a bare workstation to runners waiting for jobs:
 #
 #   uv run ansible-playbook playbooks/site.yml --ask-become-pass
 #
@@ -15,7 +15,9 @@
 - name: Provision the lab guests
   ansible.builtin.import_playbook: provision.yml
 
-# Optional, and a no-op unless `lab_services_enabled` is true.
+# Optional, and a no-op unless `lab_services_enabled` is true. It runs before
+# Gitea because that is where the CA, the DNS records and the trust store come
+# from when Gitea is served over https.
 - name: Deploy the internal services
   ansible.builtin.import_playbook: services.yml
 

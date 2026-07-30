@@ -4,11 +4,12 @@
 # Static inventory of the local KVM/QEMU lab.
 #
 #   kvm_hosts : the workstation running libvirt (this machine).
-#   lab       : the guests, grouped by role. Each one declares its own
-#               hardware sizing and its static address; cloud-init applies the
-#               address, so adding a guest needs no libvirt DHCP change as
-#               long as the IP stays inside the lab network and outside the
-#               DHCP range.
+#   lab       : the guests, split into `gitea` (the server) and `runners`
+#               (the Gitea Actions agents). Each guest declares its own
+#               hardware sizing and its static address; cloud-init applies
+#               the address, so adding a guest needs no libvirt DHCP change
+#               as long as the IP stays inside `lab_network_cidr` and
+#               outside the DHCP range.
 ---
 
 all:
@@ -19,6 +20,9 @@ all:
 
     lab:
       children:
+        # Also hosts the internal CA (step-ca) and resolver (dnsmasq) when the
+        # internal domain is enabled — no extra guest for two daemons that sit
+        # idle most of the time.
         gitea:
           hosts:
             gitea-server:

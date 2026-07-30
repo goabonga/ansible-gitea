@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+
+# Adds the lab's root certificate to the system trust store, so `git`, `curl`,
+# act_runner and the browser accept https://gitea.internal without a warning.
+# Applied to the guests and, optionally, to the workstation.
+---
+
+- name: Check that the root certificate has been fetched
+  ansible.builtin.stat:
+    path: "{{ internal_ca_trust_source }}"
+  delegate_to: localhost
+  become: false
+  register: internal_ca_trust_stat
+
+- name: Fail with a hint when the root certificate is missing
+  ansible.builtin.assert:
+    that:
+      - internal_ca_trust_stat.stat.exists
+    fail_msg: >-
+      {{ internal_ca_trust_source }} does not exist. Run
+      `ansible-playbook playbooks/services.yml` first: the step_ca role
+      fetches the root certificate from the CA guest.
+
+- name: Install the root certificate
+  ansible.builtin.copy:
+    src: "{{ internal_ca_trust_source }}"
+    dest: "{{ internal_ca_trust_dest }}"
+    owner: root
+    group: root
+    mode: "0644"
+  register: internal_ca_trust_installed
+
+# Deliberately not a handler. This role is included in the middle of another
+# role (roles/gitea/tasks/tls.yml), and `meta: flush_handlers` is global: it
+# would also fire that role's pending notifications — "Restart gitea" before
+# the unit even exists. The trust store has to be usable before this role
+# returns, since the Gitea health check verifies the chain, so the update runs
+# inline.
+- name: Update the CA trust store # noqa: no-handler
+  ansible.builtin.command:
+    cmd: update-ca-certificates
+  when: internal_ca_trust_installed is changed
+  changed_when: true

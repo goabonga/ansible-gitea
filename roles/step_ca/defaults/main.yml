@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+---
+
+step_ca_version: "0.30.2"
+step_ca_arch: amd64
+step_ca_release_base: https://github.com/smallstep/certificates/releases/download
+step_ca_package: "step-ca_{{ step_ca_version }}-1_{{ step_ca_arch }}.deb"
+step_ca_download_url: "{{ step_ca_release_base }}/v{{ step_ca_version }}/{{ step_ca_package }}"
+step_ca_checksum: "sha256:{{ step_ca_release_base }}/v{{ step_ca_version }}/checksums.txt"
+step_ca_download_dir: /var/cache/ansible-gitea
+
+step_ca_user: step
+step_ca_group: step
+# STEPPATH: the CA's whole state (config, keys, certificates, database).
+step_ca_home: /etc/step-ca
+step_ca_config: /etc/step-ca/config/ca.json
+step_ca_root_cert: /etc/step-ca/certs/root_ca.crt
+
+step_ca_name: "{{ lab_internal_domain | default('internal') }} lab CA"
+step_ca_dns_names:
+  - "{{ ansible_host | default(inventory_hostname) }}"
+step_ca_port: 9000
+step_ca_address: ":{{ step_ca_port }}"
+step_ca_provisioner: "admin@{{ lab_internal_domain | default('internal') }}"
+
+# Two independent secrets: one unlocks the CA's intermediate key, the other
+# authenticates certificate requests made through the JWK provisioner. Both
+# are generated once on the guest and never leave it.
+step_ca_password_file: /etc/step-ca/.ca-password
+step_ca_provisioner_password_file: /etc/step-ca/.provisioner-password
+
+# Published so the other guests can bootstrap without a manual copy/paste.
+# Leaf certificates keep step-ca's default 24h lifetime; their holders renew
+# them through a systemd timer.
+step_ca_fingerprint_file: /etc/step-ca/fingerprint
+step_ca_url: "https://{{ lab_ca_fqdn | default(ansible_host) }}:{{ step_ca_port }}"

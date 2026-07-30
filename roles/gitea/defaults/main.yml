@@ -38,6 +38,30 @@ gitea_http_port: 3000
 gitea_domain: "{{ ansible_host | default(inventory_hostname) }}"
 gitea_root_url: "http://{{ gitea_domain }}:{{ gitea_http_port }}/"
 
+# --- TLS from the internal CA ------------------------------------------
+# Enabled by the optional services stack. The certificate is issued by
+# step-ca with a one-time token minted on the CA guest (see
+# playbooks/gitea.yml) and renewed by a systemd timer.
+gitea_tls_enabled: false
+gitea_tls_dir: /etc/gitea/tls
+gitea_tls_cert: /etc/gitea/tls/gitea.crt
+gitea_tls_key: /etc/gitea/tls/gitea.key
+# Names the certificate must cover. 127.0.0.1 is one of them so the role's own
+# health check can verify the chain locally. The playbook bakes this list into
+# the issuance token; the CA will not sign anything outside it.
+gitea_tls_sans:
+  - "{{ gitea_domain }}"
+  - 127.0.0.1
+gitea_tls_ca_url: ""
+gitea_tls_ca_fingerprint: ""
+gitea_tls_token: ""
+gitea_tls_reload_script: /usr/local/sbin/gitea-cert-reload
+gitea_tls_renew_unit: gitea-cert-renew
+# Certificates live 24h; checking twice an hour and renewing with 8h left
+# leaves plenty of room for a guest that was suspended for a while.
+gitea_tls_renew_calendar: "*:0/30"
+gitea_tls_renew_expires_in: 8h
+
 # Gitea's built-in SSH server: no system account juggling, and it stays off
 # port 22 so the guest's own sshd keeps working.
 gitea_start_ssh_server: true
@@ -62,8 +86,9 @@ gitea_admin_username: gitea-admin
 gitea_admin_password: changeme
 gitea_admin_email: gitea-admin@example.invalid
 
-# API endpoint used by the role itself; loopback needs no DNS.
-gitea_api_url: "http://127.0.0.1:{{ gitea_http_port }}"
+# API endpoint used by the role itself. 127.0.0.1 is one of the certificate's
+# SANs, so this needs no DNS and still verifies the chain.
+gitea_api_url: "{{ 'https' if gitea_tls_enabled | bool else 'http' }}://127.0.0.1:{{ gitea_http_port }}"
 
 # Organisations created through the API once the administrator exists. Set
 # `gitea_organizations: []` to keep the instance empty.

@@ -3,12 +3,59 @@
 
 # Installs Gitea on the guest and mints the runner registration token that
 # `runners.yml` consumes.
+#
+# When the optional services stack is enabled, this playbook also mints a
+# one-time certificate token on the CA guest and hands it to the role, so the
+# Gitea guest never holds a CA credential of its own.
 ---
 
 - name: Deploy Gitea
   hosts: gitea
   become: true
   gather_facts: true
+  vars:
+    gitea_tls_ca_url: "{{ hostvars[lab_services_host].step_ca_url | default('https://' ~ lab_ca_fqdn ~ ':9000') }}"
+    gitea_tls_ca_fingerprint: "{{ gitea_ca_fingerprint | default('') }}"
+    gitea_tls_token: "{{ gitea_ca_token | default('') }}"
+
+  pre_tasks:
+    - name: Collect the certificate credentials from the CA
+      when: gitea_tls_enabled | bool
+      block:
+        - name: Read the CA fingerprint
+          delegate_to: "{{ lab_services_host }}"
+          ansible.builtin.slurp:
+            src: /etc/step-ca/fingerprint
+          register: gitea_ca_fingerprint_raw
+
+        - name: Keep the CA fingerprint for the role
+          ansible.builtin.set_fact:
+            gitea_ca_fingerprint: "{{ gitea_ca_fingerprint_raw.content | b64decode | trim }}"
+
+        # Single-use and short-lived: it only authorises this one certificate
+        # request. Renewals afterwards use the certificate itself.
+        - name: Mint a certificate token
+          delegate_to: "{{ lab_services_host }}"
+          become: true
+          become_user: step
+          ansible.builtin.command:
+            cmd: >-
+              step ca token {{ lab_gitea_fqdn }}
+              --provisioner admin@{{ lab_internal_domain }}
+              --password-file /etc/step-ca/.provisioner-password
+              --not-after 10m
+              {% for san in gitea_tls_sans %}--san {{ san }} {% endfor %}
+          environment:
+            STEPPATH: /etc/step-ca
+          register: gitea_ca_token_result
+          changed_when: false
+          no_log: true
+
+        - name: Keep the certificate token for the role
+          ansible.builtin.set_fact:
+            gitea_ca_token: "{{ gitea_ca_token_result.stdout | trim }}"
+          no_log: true
+
   roles:
     - role: gitea
 

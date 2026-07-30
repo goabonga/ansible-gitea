@@ -1,0 +1,93 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+
+# Requests the server certificate from the lab's step-ca and keeps it fresh.
+# The playbook mints a short-lived one-time token on the CA guest and passes
+# it in, so this guest never holds a CA credential.
+---
+
+- name: Check that the CA details were provided
+  ansible.builtin.assert:
+    that:
+      - gitea_tls_ca_url | length > 0
+      - gitea_tls_ca_fingerprint | length > 0
+      - gitea_tls_token | length > 0
+    fail_msg: >-
+      TLS is enabled but the CA details are missing. Run
+      `ansible-playbook playbooks/services.yml` first, then
+      `playbooks/gitea.yml`, which mints the certificate token on
+      {{ lab_services_host | default('the CA guest') }}.
+
+- name: Install the step CLI
+  ansible.builtin.include_role:
+    name: step_cli
+
+- name: Create the certificate directory
+  ansible.builtin.file:
+    path: "{{ gitea_tls_dir }}"
+    state: directory
+    owner: root
+    group: "{{ gitea_group }}"
+    mode: "0750"
+
+- name: Trust the internal certificate authority
+  ansible.builtin.include_role:
+    name: internal_ca_trust
+
+- name: Bootstrap the connection to the CA
+  ansible.builtin.command:
+    cmd: >-
+      step ca bootstrap
+      --ca-url {{ gitea_tls_ca_url }}
+      --fingerprint {{ gitea_tls_ca_fingerprint }}
+      --force
+    creates: /root/.step/config/defaults.json
+
+# The subject alternative names are the ones baked into the token by
+# playbooks/gitea.yml: step refuses `--san` together with `--token`, because a
+# token is a signed promise about exactly which names may be issued.
+- name: Request the server certificate
+  ansible.builtin.command:
+    cmd: >-
+      step ca certificate {{ gitea_domain }}
+      {{ gitea_tls_cert }} {{ gitea_tls_key }}
+      --token {{ gitea_tls_token }}
+    creates: "{{ gitea_tls_cert }}"
+  no_log: true
+
+- name: Let Gitea read the certificate
+  ansible.builtin.file:
+    path: "{{ item }}"
+    owner: root
+    group: "{{ gitea_group }}"
+    mode: "0640"
+  loop:
+    - "{{ gitea_tls_cert }}"
+    - "{{ gitea_tls_key }}"
+
+- name: Install the certificate reload helper
+  ansible.builtin.template:
+    src: gitea-cert-reload.j2
+    dest: "{{ gitea_tls_reload_script }}"
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Install the renewal unit and timer
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - "{{ gitea_tls_renew_unit }}.service"
+    - "{{ gitea_tls_renew_unit }}.timer"
+  notify: Restart the certificate renewal timer
+
+- name: Enable the renewal timer
+  ansible.builtin.systemd_service:
+    name: "{{ gitea_tls_renew_unit }}.timer"
+    state: started
+    enabled: true
+    daemon_reload: true

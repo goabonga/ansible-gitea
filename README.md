@@ -16,9 +16,16 @@ no account.
    workstation (libvirt / qemu:///system)
    ├── network gitea-lab  192.168.170.0/24  NAT
    ├── gitea-server    192.168.170.10   Gitea 1.27 + PostgreSQL (systemd)
-   │                                    http :3000   ssh :2222
+   │                                    https :443   ssh :2222
+   │                                    step-ca :9000   dnsmasq :53
    └── gitea-runner-1  192.168.170.11   2 act_runner agents + Docker
 ```
+
+The Gitea guest also runs the internal CA and resolver, which is what makes the
+lab reachable by name over TLS. Turn that off
+(`lab_services_enabled: false`) and the lab falls back to plain
+`http://192.168.170.10:3000` — see
+[Internal domain and TLS](#internal-domain-and-tls).
 
 Everything is installed natively from upstream binaries — no container to
 build, `systemctl status gitea` and `journalctl -u 'act_runner@*'` behave the
@@ -57,10 +64,14 @@ Roughly ten minutes later:
 
 | What | Where | Credentials |
 | --- | --- | --- |
-| Gitea web UI | <http://192.168.170.10:3000/> | `gitea-admin` / `GiteaLab#2026` |
-| Git over SSH | `ssh://git@192.168.170.10:2222/<owner>/<repo>.git` | your lab key |
+| Gitea web UI | <https://gitea.internal/> | `gitea-admin` / `GiteaLab#2026` |
+| Git over HTTPS | `https://gitea.internal/<owner>/<repo>.git` | same |
+| Git over SSH | `ssh://git@gitea.internal:2222/<owner>/<repo>.git` | your lab key |
 | Runners | *Site administration → Actions → Runners* | — |
-| Organisation | <http://192.168.170.10:3000/lab> | owned by the admin |
+| Organisation | <https://gitea.internal/lab> | owned by the admin |
+
+With `lab_services_enabled: false`, that is `http://192.168.170.10:3000/` and
+`ssh://git@192.168.170.10:2222/...` instead.
 
 Those credentials are lab defaults sitting in
 `inventory/group_vars/gitea.yml`. Change them there (or in a vault) before the
@@ -78,9 +89,6 @@ gitea_organizations:
     description: Working area for the local lab
     visibility: private   # or public
 ```
-
-Each guest boots a thin qcow2 overlay on the shared base image, so adding one
-costs seconds and a few MiB.
 
 ## Running a workflow
 
@@ -110,8 +118,8 @@ the job up within a couple of seconds.
 | `playbooks/site.yml` | The whole lab, in order |
 | `playbooks/kvm-host.yml` | Workstation: packages, libvirt, lab keypair, NAT network |
 | `playbooks/provision.yml` | Creates the guests and waits for cloud-init |
-| `playbooks/services.yml` | Optional: the internal domain and the workstation wiring |
-| `playbooks/gitea.yml` | PostgreSQL, Gitea, admin user, organisations, runner token |
+| `playbooks/services.yml` | Optional: step-ca, dnsmasq, workstation wiring |
+| `playbooks/gitea.yml` | PostgreSQL, Gitea, admin user, runner token, TLS certificate |
 | `playbooks/runners.yml` | Docker and the `act_runner` agents |
 | `playbooks/destroy.yml` | Removes the guests, their disks, and the workstation changes |
 
@@ -130,32 +138,70 @@ uv run ansible-playbook playbooks/site.yml --ask-become-pass
 
 Add `-e lab_destroy_network=true` to remove the libvirt network as well.
 
-## Internal domain
+`destroy.yml` also puts the **workstation** back the way it was, since the lab
+writes two files outside its own guests:
 
-One switch gives the lab its own DNS, so guests answer by name instead of by
-address. It is on in this inventory:
+| Reverted | How |
+| --- | --- |
+| `/etc/systemd/resolved.conf.d/lab-internal.conf` | Removed, then systemd-resolved restarted |
+| `/usr/local/share/ca-certificates/lab-internal-root.crt` | Removed, then `update-ca-certificates --fresh` rebuilds the bundle and drops the `/etc/ssl/certs` symlink |
+| `~/.local/share/ansible-gitea/root_ca.crt` | Removed |
+
+Kept on purpose: the lab SSH keypair, the base cloud image, and the libvirt
+network (unless you pass the flag above). A copy of the root certificate that
+*you* imported into a browser's own store has to be removed there by hand —
+`update-ca-certificates` does not reach into NSS profiles.
+
+## Internal domain and TLS
+
+One switch turns the lab from a set of IP addresses into a named, TLS-served
+environment. It is on in this inventory:
 
 ```yaml
 # inventory/group_vars/all.yml
-lab_services_enabled: true   # false for a plain address-based lab
+lab_services_enabled: true   # false for a plain http lab
 ```
 
-A dnsmasq on the Gitea guest is authoritative for `*.internal`
-(`gitea.internal` for now) and forwards everything else to libvirt. It has its
-own tag:
+Two daemons on the Gitea guest do the work — no extra VM, and no port that
+Gitea or PostgreSQL already uses:
+
+| Piece | Where | What it gives you |
+| --- | --- | --- |
+| [step-ca](https://smallstep.com/docs/step-ca) | `gitea-server:9000` | A private CA. Gitea gets a certificate for `gitea.internal`, renewed every 30 min by a systemd timer while it has less than 8 h left. |
+| dnsmasq | `gitea-server:53` | Authoritative for `*.internal` (`gitea.internal`, `ca.internal`), forwards the rest to libvirt. |
+
+Gitea then serves **https://gitea.internal** on 443, the agents re-register
+against that URL by themselves, and the root certificate is added to the trust
+store of the guests and — unless you set `lab_configure_workstation: false` —
+of the workstation, along with a systemd-resolved drop-in routing `~internal`
+to the lab. Both workstation changes are reverted by `playbooks/destroy.yml`.
+
+```bash
+# From the workstation, once services.yml has run:
+git clone https://gitea.internal/lab/my-repo.git
+```
+
+Either piece can be switched off on its own — `lab_step_ca_enabled`,
+`lab_dnsmasq_enabled` — and each has its own tag:
 
 ```bash
 uv run ansible-playbook playbooks/services.yml --tags dnsmasq
 ```
 
-The guests get a systemd-resolved drop-in routing `~internal` to it, and so
-does the workstation unless you set `lab_configure_workstation: false` — that
-one is reverted by `playbooks/destroy.yml`.
+Worth knowing:
 
-```bash
-# From the workstation, once services.yml has run:
-git clone http://gitea.internal:3000/lab/my-repo.git
-```
+- **Browsers keep their own trust store.** Firefox needs
+  `security.enterprise_roots.enabled=true` (or an import of
+  `~/.local/share/ansible-gitea/root_ca.crt`); Chrome reads the NSS store,
+  which `update-ca-certificates` does not populate.
+- **The CA's root key never leaves the guest.** Certificate requests use
+  single-use 10-minute tokens minted locally by `playbooks/gitea.yml`, and only
+  the root *certificate* is fetched to the workstation.
+- **Moving the CA and resolver to their own guest** is a one-line change:
+  point `lab_services_host` at another host of the `lab` group. Everything
+  else — the DNS records, the CA URL, the resolver drop-in — follows it.
+- Switching the stack on or off changes Gitea's URL, so existing clones need
+  their remote updated.
 
 ## Customising
 
@@ -163,20 +209,21 @@ Everything lives in the inventory; the roles only hold defaults.
 
 | File | Typical change |
 | --- | --- |
-| `inventory/local.yml` | Guests: sizing, addresses, groups |
-| `inventory/group_vars/all.yml` | Network plan, base image, lab paths |
-| `inventory/group_vars/gitea.yml` | Gitea version, ports, credentials, organisations |
+| `inventory/local.yml` | Guest sizing, addresses, extra runner hosts |
+| `inventory/group_vars/all.yml` | Network plan, base image, lab paths, optional stack |
+| `inventory/group_vars/gitea.yml` | Gitea version, ports, credentials, DNS records, CA names |
 | `inventory/group_vars/runners.yml` | Runner version, agent count, labels |
 
-**More job concurrency** — raise `act_runner_count` (agents on the existing
-guest) or add a host to the `runners` group with a free address and MAC.
+Two frequent ones:
 
-**Different image** — point `lab_image_url` and `lab_image_checksum_url` at
-another cloud image; anything cloud-init based and Debian-flavoured works.
+- **More job concurrency** — raise `act_runner_count` (agents on the existing
+  guest) or add a host to the `runners` group with a free address and MAC.
+- **Different image** — point `lab_image_url` and `lab_image_checksum_url` at
+  another cloud image; anything cloud-init based and Debian-flavoured works.
 
-**Reusing this skeleton for another project** — clone it, then rename the lab
-(`lab_network_name`, `lab_network_bridge`, `lab_state_dir`) and the project
-itself (`pyproject.toml`, `multicz.toml`, the README and the badges).
+Guests get their address from cloud-init rather than DHCP, so adding one only
+requires an address inside `192.168.170.0/24` and outside the DHCP range
+(`.100`–`.200`).
 
 ## Layout
 
@@ -184,16 +231,19 @@ itself (`pyproject.toml`, `multicz.toml`, the README and the badges).
 ansible-gitea/
 ├── ansible.cfg
 ├── inventory/
-│   ├── local.yml              # the guests and the workstation
+│   ├── local.yml              # the two guests and the workstation
 │   └── group_vars/
 ├── playbooks/
 ├── roles/
 │   ├── kvm_host/              # libvirt, lab keypair, NAT network
 │   ├── vm/                    # cloud image overlay + NoCloud seed + domain
+│   ├── gitea/                 # binary, PostgreSQL, app.ini, systemd, admin, TLS
+│   ├── act_runner/            # binary, Docker, one systemd instance per agent
+│   ├── step_cli/              # optional: the `step` CLI
+│   ├── step_ca/               # optional: the internal certificate authority
 │   ├── internal_dns/          # optional: dnsmasq serving *.internal
 │   ├── internal_resolver/     # optional: systemd-resolved routing for *.internal
-│   ├── gitea/                 # binary, PostgreSQL, app.ini, systemd, admin
-│   └── act_runner/            # binary, Docker, one systemd instance per agent
+│   └── internal_ca_trust/     # optional: trust the internal root certificate
 ├── requirements.yml           # Galaxy collections
 └── multicz.toml               # versioning and changelog
 ```

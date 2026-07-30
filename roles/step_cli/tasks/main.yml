@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+
+# Installs the `step` CLI. Included by any role that talks to the internal CA;
+# apt makes it a no-op once the right version is in place.
+---
+
+- name: Create the download cache directory
+  ansible.builtin.file:
+    path: "{{ step_cli_download_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Download the step CLI package
+  ansible.builtin.get_url:
+    url: "{{ step_cli_download_url }}"
+    dest: "{{ step_cli_download_dir }}/{{ step_cli_package }}"
+    checksum: "{{ step_cli_checksum }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Install the step CLI
+  ansible.builtin.apt:
+    deb: "{{ step_cli_download_dir }}/{{ step_cli_package }}"
+    state: present

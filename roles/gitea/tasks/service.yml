@@ -25,6 +25,8 @@
 
 - name: Wait for the Gitea API to answer
   ansible.builtin.uri:
+    # gitea_api_url points at 127.0.0.1, one of the certificate's SANs, and the
+    # internal root is in the guest's trust store: verified even locally.
     url: "{{ gitea_api_url }}/api/healthz"
     status_code: 200
   register: gitea_health

@@ -18,6 +18,12 @@
   tags:
     - gitea_install
 
+- name: Obtain the server certificate
+  ansible.builtin.import_tasks: tls.yml
+  when: gitea_tls_enabled | bool
+  tags:
+    - gitea_tls
+
 - name: Configure Gitea
   ansible.builtin.import_tasks: configure.yml
   tags:

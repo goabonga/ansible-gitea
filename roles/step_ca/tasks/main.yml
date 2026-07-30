@@ -1,0 +1,144 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+
+# Brings up an internal certificate authority for the lab. The root key stays
+# on this guest; the other guests only ever see the root certificate and
+# short-lived leaf certificates they renew themselves.
+---
+
+- name: Install the step CLI
+  ansible.builtin.include_role:
+    name: step_cli
+
+- name: Download the step-ca package
+  ansible.builtin.get_url:
+    url: "{{ step_ca_download_url }}"
+    dest: "{{ step_ca_download_dir }}/{{ step_ca_package }}"
+    checksum: "{{ step_ca_checksum }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Install step-ca
+  ansible.builtin.apt:
+    deb: "{{ step_ca_download_dir }}/{{ step_ca_package }}"
+    state: present
+
+- name: Create the CA group
+  ansible.builtin.group:
+    name: "{{ step_ca_group }}"
+    system: true
+    state: present
+
+- name: Create the CA service account
+  ansible.builtin.user:
+    name: "{{ step_ca_user }}"
+    group: "{{ step_ca_group }}"
+    home: "{{ step_ca_home }}"
+    shell: /usr/sbin/nologin
+    comment: step-ca service account
+    system: true
+    create_home: true
+    state: present
+
+- name: Restrict the CA state directory
+  ansible.builtin.file:
+    path: "{{ step_ca_home }}"
+    state: directory
+    owner: "{{ step_ca_user }}"
+    group: "{{ step_ca_group }}"
+    mode: "0750"
+
+# The CA's home is its STEPPATH, and Ansible drops the module payload of every
+# `become_user: step` task in the become user's ~/.ansible/tmp. Creating it up
+# front with the right ownership avoids the "remote_tmp did not exist and was
+# created with a mode of 0700" warning on the first run.
+- name: Pre-create the Ansible temp directory of the CA user
+  ansible.builtin.file:
+    path: "{{ step_ca_home }}/.ansible/tmp"
+    state: directory
+    owner: "{{ step_ca_user }}"
+    group: "{{ step_ca_group }}"
+    mode: "0700"
+
+- name: Generate the CA secrets
+  ansible.builtin.shell:
+    cmd: "set -o pipefail && openssl rand -base64 32 | tr -d '\\n' > {{ item }}"
+    creates: "{{ item }}"
+    executable: /bin/bash
+  loop:
+    - "{{ step_ca_password_file }}"
+    - "{{ step_ca_provisioner_password_file }}"
+
+- name: Restrict the CA secrets
+  ansible.builtin.file:
+    path: "{{ item }}"
+    owner: "{{ step_ca_user }}"
+    group: "{{ step_ca_group }}"
+    mode: "0400"
+  loop:
+    - "{{ step_ca_password_file }}"
+    - "{{ step_ca_provisioner_password_file }}"
+
+- name: Initialise the certificate authority
+  ansible.builtin.command:
+    cmd: >-
+      step ca init
+      --name {{ step_ca_name | quote }}
+      --dns {{ step_ca_dns_names | join(',') }}
+      --address {{ step_ca_address }}
+      --provisioner {{ step_ca_provisioner }}
+      --password-file {{ step_ca_password_file }}
+      --provisioner-password-file {{ step_ca_provisioner_password_file }}
+      --deployment-type standalone
+    creates: "{{ step_ca_config }}"
+  become: true
+  become_user: "{{ step_ca_user }}"
+  environment:
+    STEPPATH: "{{ step_ca_home }}"
+
+- name: Install the step-ca systemd unit
+  ansible.builtin.template:
+    src: step-ca.service.j2
+    dest: /etc/systemd/system/step-ca.service
+    owner: root
+    group: root
+    mode: "0644"
+  register: step_ca_unit_state
+
+# Started (or restarted, when the unit changed) inline rather than through a
+# handler: this role is included mid-play, where `meta: flush_handlers` would
+# also fire the surrounding role's pending notifications. The CA has to be
+# answering before this role returns.
+- name: Enable and start step-ca
+  ansible.builtin.systemd_service:
+    name: step-ca
+    state: "{{ 'restarted' if step_ca_unit_state is changed else 'started' }}"
+    enabled: true
+    daemon_reload: true
+
+- name: Wait for the CA to listen
+  ansible.builtin.wait_for:
+    host: 127.0.0.1
+    port: "{{ step_ca_port }}"
+    timeout: 60
+
+- name: Record the root certificate fingerprint
+  ansible.builtin.shell:
+    cmd: >-
+      step certificate fingerprint {{ step_ca_root_cert }}
+      > {{ step_ca_fingerprint_file }}
+    creates: "{{ step_ca_fingerprint_file }}"
+
+- name: Publish the fingerprint to the other guests
+  ansible.builtin.file:
+    path: "{{ step_ca_fingerprint_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Fetch the root certificate to the workstation
+  ansible.builtin.fetch:
+    src: "{{ step_ca_root_cert }}"
+    dest: "{{ lab_state_dir }}/root_ca.crt"
+    flat: true

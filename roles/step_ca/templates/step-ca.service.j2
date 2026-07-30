@@ -1,0 +1,30 @@
+; SPDX-License-Identifier: MIT
+; Copyright (c) 2026 Chris <goabonga@pm.me>
+;
+; Managed by Ansible (roles/step_ca) - local edits are overwritten.
+[Unit]
+Description=step-ca internal certificate authority
+Documentation=https://smallstep.com/docs/step-ca
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=30
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User={{ step_ca_user }}
+Group={{ step_ca_group }}
+Environment=STEPPATH={{ step_ca_home }}
+ExecStart=/usr/bin/step-ca {{ step_ca_config }} --password-file {{ step_ca_password_file }}
+ExecReload=/bin/kill --signal HUP $MAINPID
+Restart=on-failure
+RestartSec=5s
+; The CA only ever needs its own state directory.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths={{ step_ca_home }}
+
+[Install]
+WantedBy=multi-user.target
