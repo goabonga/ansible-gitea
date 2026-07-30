@@ -110,6 +110,7 @@ the job up within a couple of seconds.
 | `playbooks/site.yml` | The whole lab, in order |
 | `playbooks/kvm-host.yml` | Workstation: packages, libvirt, lab keypair, NAT network |
 | `playbooks/provision.yml` | Creates the guests and waits for cloud-init |
+| `playbooks/services.yml` | Optional: the internal domain |
 | `playbooks/gitea.yml` | PostgreSQL, Gitea, admin user, organisations, runner token |
 | `playbooks/runners.yml` | Docker and the `act_runner` agents |
 | `playbooks/destroy.yml` | Removes the guests, their disks and their seeds |
@@ -128,6 +129,26 @@ uv run ansible-playbook playbooks/site.yml --ask-become-pass
 ```
 
 Add `-e lab_destroy_network=true` to remove the libvirt network as well.
+
+## Internal domain
+
+One switch gives the lab its own DNS, so guests answer by name instead of by
+address. It is on in this inventory:
+
+```yaml
+# inventory/group_vars/all.yml
+lab_services_enabled: true   # false for a plain address-based lab
+```
+
+A dnsmasq on the Gitea guest is authoritative for `*.internal`
+(`gitea.internal` for now) and forwards everything else to libvirt. It has its
+own tag:
+
+```bash
+uv run ansible-playbook playbooks/services.yml --tags dnsmasq
+```
+
+Nothing points at it yet — the machines that should ask it come next.
 
 ## Customising
 
@@ -162,6 +183,7 @@ ansible-gitea/
 ├── roles/
 │   ├── kvm_host/              # libvirt, lab keypair, NAT network
 │   ├── vm/                    # cloud image overlay + NoCloud seed + domain
+│   ├── internal_dns/          # optional: dnsmasq serving *.internal
 │   ├── gitea/                 # binary, PostgreSQL, app.ini, systemd, admin
 │   └── act_runner/            # binary, Docker, one systemd instance per agent
 ├── requirements.yml           # Galaxy collections

@@ -32,3 +32,10 @@ gitea_organizations:
     full_name: Lab
     description: "Working area for the local lab"
     visibility: private
+
+# --- The internal services this guest also hosts --------------------------
+# dnsmasq answers for the lab and forwards everything else to libvirt's own
+# resolver on the gateway.
+internal_dns_records:
+  - name: "{{ lab_gitea_fqdn }}"
+    ip: "{{ vm_ip }}"

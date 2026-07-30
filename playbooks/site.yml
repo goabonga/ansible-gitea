@@ -15,6 +15,10 @@
 - name: Provision the lab guests
   ansible.builtin.import_playbook: provision.yml
 
+# Optional, and a no-op unless `lab_services_enabled` is true.
+- name: Deploy the internal services
+  ansible.builtin.import_playbook: services.yml
+
 - name: Deploy Gitea
   ansible.builtin.import_playbook: gitea.yml
 

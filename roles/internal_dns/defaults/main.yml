@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+---
+
+internal_dns_packages:
+  - dnsmasq
+  # dig, used by the role's own resolution self-test.
+  - bind9-dnsutils
+
+internal_dns_domain: "{{ lab_internal_domain | default('internal') }}"
+internal_dns_config: /etc/dnsmasq.d/lab-internal.conf
+
+# Explicit addresses only: the guest also runs systemd-resolved on
+# 127.0.0.53, so dnsmasq must not grab the wildcard.
+internal_dns_listen_addresses:
+  - "{{ ansible_host | default(inventory_hostname) }}"
+  - 127.0.0.1
+
+# Everything outside the lab domain goes to libvirt's own resolver on the
+# gateway, which already forwards to the workstation's upstream DNS.
+internal_dns_upstream:
+  - "{{ lab_network_gateway }}"
+
+# name -> ip; usually set from the inventory (group_vars/services.yml).
+internal_dns_records: []
+
+# Answer VPN clients too, not just the lab bridge.
+internal_dns_extra_networks: []
