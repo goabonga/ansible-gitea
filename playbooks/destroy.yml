@@ -34,3 +34,36 @@
         state: absent
         uri: "{{ lab_libvirt_uri }}"
       when: lab_destroy_network | default(false) | bool
+
+# The internal domain reaches into the workstation's resolver, so a teardown
+# has to put it back.
+- name: Undo the workstation changes
+  hosts: kvm_hosts
+  gather_facts: false
+  tasks:
+    - name: Stop routing the lab domain
+      become: true
+      ansible.builtin.file:
+        path: "{{ lab_resolver_dropin }}"
+        state: absent
+      notify: Restart systemd-resolved
+
+    - name: Apply the pending workstation cleanup
+      ansible.builtin.meta: flush_handlers
+
+    - name: Confirm what was left alone
+      ansible.builtin.debug:
+        msg:
+          - "Removed: {{ lab_resolver_dropin }}."
+          - >-
+            Kept on purpose: the lab SSH keypair
+            ({{ lab_ssh_key_path }}), the base cloud image in
+            {{ lab_libvirt_images_dir }}, and the libvirt network
+            ({{ lab_network_name }}) unless -e lab_destroy_network=true.
+
+  handlers:
+    - name: Restart systemd-resolved
+      become: true
+      ansible.builtin.systemd_service:
+        name: systemd-resolved
+        state: restarted

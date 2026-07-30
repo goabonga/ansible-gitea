@@ -110,10 +110,10 @@ the job up within a couple of seconds.
 | `playbooks/site.yml` | The whole lab, in order |
 | `playbooks/kvm-host.yml` | Workstation: packages, libvirt, lab keypair, NAT network |
 | `playbooks/provision.yml` | Creates the guests and waits for cloud-init |
-| `playbooks/services.yml` | Optional: the internal domain |
+| `playbooks/services.yml` | Optional: the internal domain and the workstation wiring |
 | `playbooks/gitea.yml` | PostgreSQL, Gitea, admin user, organisations, runner token |
 | `playbooks/runners.yml` | Docker and the `act_runner` agents |
-| `playbooks/destroy.yml` | Removes the guests, their disks and their seeds |
+| `playbooks/destroy.yml` | Removes the guests, their disks, and the workstation changes |
 
 Each play is independent, so a change to Gitea alone is:
 
@@ -148,7 +148,14 @@ own tag:
 uv run ansible-playbook playbooks/services.yml --tags dnsmasq
 ```
 
-Nothing points at it yet — the machines that should ask it come next.
+The guests get a systemd-resolved drop-in routing `~internal` to it, and so
+does the workstation unless you set `lab_configure_workstation: false` — that
+one is reverted by `playbooks/destroy.yml`.
+
+```bash
+# From the workstation, once services.yml has run:
+git clone http://gitea.internal:3000/lab/my-repo.git
+```
 
 ## Customising
 
@@ -184,6 +191,7 @@ ansible-gitea/
 │   ├── kvm_host/              # libvirt, lab keypair, NAT network
 │   ├── vm/                    # cloud image overlay + NoCloud seed + domain
 │   ├── internal_dns/          # optional: dnsmasq serving *.internal
+│   ├── internal_resolver/     # optional: systemd-resolved routing for *.internal
 │   ├── gitea/                 # binary, PostgreSQL, app.ini, systemd, admin
 │   └── act_runner/            # binary, Docker, one systemd instance per agent
 ├── requirements.yml           # Galaxy collections

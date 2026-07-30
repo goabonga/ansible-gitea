@@ -55,3 +55,12 @@ lab_dnsmasq_enabled: "{{ lab_services_enabled | bool }}"
 # with a real domain.
 lab_internal_domain: internal
 lab_gitea_fqdn: "gitea.{{ lab_internal_domain }}"
+
+# Point the workstation's resolver at the lab for `*.internal`, so the browser
+# and git reach the guests by name. Reverted by playbooks/destroy.yml.
+lab_configure_workstation: true
+
+# The file the lab writes outside its own guests. It lives here, at inventory
+# level, so the role that creates it and the teardown that removes it cannot
+# drift apart: a role default would be invisible to playbooks/destroy.yml.
+lab_resolver_dropin: /etc/systemd/resolved.conf.d/lab-internal.conf

@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+#
+# Managed by Ansible (roles/internal_resolver) - local edits are overwritten.
+# `~domain` is a routing-only domain: queries for it go to the server below,
+# everything else keeps using this host's normal DNS.
+[Resolve]
+DNS={{ internal_resolver_address }}
+Domains=~{{ internal_resolver_domain }}
