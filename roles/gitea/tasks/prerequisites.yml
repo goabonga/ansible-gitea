@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+---
+
+- name: Install git and git-lfs
+  ansible.builtin.apt:
+    name: "{{ gitea_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Create the Gitea group
+  ansible.builtin.group:
+    name: "{{ gitea_group }}"
+    system: true
+    state: present
+
+- name: Create the Gitea service account
+  ansible.builtin.user:
+    name: "{{ gitea_user }}"
+    group: "{{ gitea_group }}"
+    home: "{{ gitea_home }}"
+    shell: /bin/bash
+    comment: Gitea service account
+    system: true
+    create_home: true
+    state: present
+
+- name: Create the Gitea directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner | default(gitea_user) }}"
+    group: "{{ item.group | default(gitea_group) }}"
+    mode: "{{ item.mode | default('0750') }}"
+  loop:
+    # Ansible drops the module payload of every `become_user: git` task in that
+    # user's ~/.ansible/tmp. Creating it here, with the right ownership, keeps
+    # the "remote_tmp did not exist" warning out of the first run.
+    - path: "{{ gitea_home }}/.ansible/tmp"
+      mode: "0700"
+    - path: "{{ gitea_work_dir }}"
+    - path: "{{ gitea_data_dir }}"
+    - path: "{{ gitea_repository_root }}"
+    - path: "{{ gitea_lfs_dir }}"
+    - path: "{{ gitea_log_dir }}"
+    # Owned by root so the service account cannot rewrite its own config;
+    # group-readable so it can still read app.ini.
+    - path: "{{ gitea_config_dir }}"
+      owner: root
+      mode: "0750"
+  loop_control:
+    label: "{{ item.path }}"

@@ -20,3 +20,4 @@ skip_list:
 mock_roles:
   - kvm_host
   - vm
+  - gitea

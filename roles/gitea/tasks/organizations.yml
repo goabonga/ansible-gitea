@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+
+# Creates the organisations declared in `gitea_organizations`. Gitea's CLI has
+# no organisation command, so this goes through the API as the administrator;
+# the check first makes it idempotent.
+---
+
+- name: Look for the declared organisations
+  ansible.builtin.uri:
+    url: "{{ gitea_api_url }}/api/v1/orgs/{{ item.username }}"
+    method: GET
+    url_username: "{{ gitea_admin_username }}"
+    url_password: "{{ gitea_admin_password }}"
+    force_basic_auth: true
+    status_code: [200, 404]
+  loop: "{{ gitea_organizations }}"
+  register: gitea_organization_state
+  changed_when: false
+  # The admin password travels in the request; the loop labels would leak it
+  # in the task header otherwise.
+  no_log: true
+
+- name: Create the missing organisations
+  ansible.builtin.uri:
+    url: "{{ gitea_api_url }}/api/v1/orgs"
+    method: POST
+    body_format: json
+    body:
+      username: "{{ item.item.username }}"
+      full_name: "{{ item.item.full_name | default(item.item.username) }}"
+      description: "{{ item.item.description | default('') }}"
+      visibility: "{{ item.item.visibility | default('private') }}"
+      repo_admin_change_team_access: true
+    url_username: "{{ gitea_admin_username }}"
+    url_password: "{{ gitea_admin_password }}"
+    force_basic_auth: true
+    status_code: 201
+  loop: "{{ gitea_organization_state.results }}"
+  when: item.status == 404
+  no_log: true
+
+- name: List the organisations that exist now
+  ansible.builtin.debug:
+    msg: >-
+      Organisations: {{ gitea_organizations | map(attribute='username') | join(', ') }}
+      ({{ gitea_root_url | trim }})

@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+
+# Mints one instance-wide runner registration token and keeps it on disk, so
+# re-running the playbooks does not invalidate the agents already registered
+# against it. `playbooks/runners.yml` reads this file back over SSH.
+---
+
+- name: Generate the runner registration token
+  ansible.builtin.shell:
+    cmd: >-
+      {{ gitea_binary }} --config {{ gitea_config_file }}
+      actions generate-runner-token
+      > {{ gitea_runner_token_file }}
+    creates: "{{ gitea_runner_token_file }}"
+  become: true
+  become_user: "{{ gitea_user }}"
+  environment:
+    GITEA_WORK_DIR: "{{ gitea_work_dir }}"
+
+- name: Restrict the runner registration token
+  ansible.builtin.file:
+    path: "{{ gitea_runner_token_file }}"
+    owner: "{{ gitea_user }}"
+    group: "{{ gitea_group }}"
+    mode: "0600"
+
+- name: Read the runner registration token
+  ansible.builtin.slurp:
+    src: "{{ gitea_runner_token_file }}"
+  register: gitea_runner_token_raw
+  no_log: true
+
+- name: Publish the runner registration token to the play
+  ansible.builtin.set_fact:
+    gitea_runner_registration_token: "{{ gitea_runner_token_raw.content | b64decode | trim }}"
+  no_log: true

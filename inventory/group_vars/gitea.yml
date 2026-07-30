@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+
+# Gitea server settings. Everything here is a lab default: the credentials
+# are meant for a throwaway VM reachable only from the workstation.
+# Override them (and `gitea_db_password`) in a vault before reusing this
+# anywhere else.
+---
+
+gitea_version: "1.27.1"
+gitea_http_port: 3000
+gitea_domain: "{{ vm_ip }}"
+gitea_root_url: "http://{{ gitea_domain }}:{{ gitea_http_port }}/"
+
+# Gitea's built-in SSH server, kept off 22 so it does not clash with sshd.
+gitea_ssh_port: 2222
+gitea_admin_username: gitea-admin
+gitea_admin_password: "GiteaLab#2026"
+gitea_admin_email: "gitea-admin@{{ lab_network_domain }}"
+gitea_db_password: "GiteaLabDb#2026"
+gitea_disable_registration: true
+gitea_actions_enabled: true
+# Declared here (and not only as a role default) so `playbooks/runners.yml`
+# can read the path out of hostvars when it fetches the token.
+gitea_runner_token_file: /var/lib/gitea/runner-registration-token
+
+# Organisations created on first deployment. Repositories under an
+# organisation get their own Actions secrets and runner scope, which is the
+# usual shape for real work — set to [] for a bare instance.
+gitea_organizations:
+  - username: lab
+    full_name: Lab
+    description: "Working area for the local lab"
+    visibility: private

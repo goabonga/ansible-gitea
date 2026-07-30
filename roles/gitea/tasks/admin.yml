@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+
+# Gitea's CLI takes the password as an argument, so it is briefly visible in
+# the guest's process list. That is acceptable for a throwaway lab; rotate
+# the password from the web UI if the guest is ever shared.
+---
+
+- name: List the existing Gitea administrators
+  ansible.builtin.command:
+    cmd: "{{ gitea_binary }} --config {{ gitea_config_file }} admin user list --admin"
+  become: true
+  become_user: "{{ gitea_user }}"
+  environment:
+    GITEA_WORK_DIR: "{{ gitea_work_dir }}"
+  changed_when: false
+  register: gitea_admin_list
+
+- name: Create the Gitea administrator
+  ansible.builtin.command:
+    cmd: >-
+      {{ gitea_binary }} --config {{ gitea_config_file }}
+      admin user create
+      --username {{ gitea_admin_username }}
+      --password {{ gitea_admin_password }}
+      --email {{ gitea_admin_email }}
+      --admin
+      --must-change-password=false
+  become: true
+  become_user: "{{ gitea_user }}"
+  environment:
+    GITEA_WORK_DIR: "{{ gitea_work_dir }}"
+  when: gitea_admin_username not in gitea_admin_list.stdout
+  changed_when: true
+  no_log: true

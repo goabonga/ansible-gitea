@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+
+# PostgreSQL runs on the Gitea guest itself: the lab is a single machine and
+# an external database would only add moving parts.
+---
+
+- name: Install PostgreSQL
+  ansible.builtin.apt:
+    name: "{{ gitea_db_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Ensure PostgreSQL is running
+  ansible.builtin.systemd_service:
+    name: postgresql
+    state: started
+    enabled: true
+
+# Same reason as for the `git` account: the tasks below become `postgres`, and
+# Ansible needs that user's ~/.ansible/tmp to hand it the module payload.
+- name: Create the Ansible temp directory of the database user
+  ansible.builtin.file:
+    path: "{{ gitea_db_user_home }}/.ansible/tmp"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: "0700"
+
+- name: Create the Gitea database role
+  become: true
+  become_user: postgres
+  community.postgresql.postgresql_user:
+    name: "{{ gitea_db_user }}"
+    password: "{{ gitea_db_password }}"
+    state: present
+  no_log: true
+
+- name: Create the Gitea database
+  become: true
+  become_user: postgres
+  community.postgresql.postgresql_db:
+    name: "{{ gitea_db_name }}"
+    owner: "{{ gitea_db_user }}"
+    encoding: UTF-8
+    lc_collate: C
+    lc_ctype: C
+    template: template0
+    state: present

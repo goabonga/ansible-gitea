@@ -1,0 +1,96 @@
+; SPDX-License-Identifier: MIT
+; Copyright (c) 2026 Chris <goabonga@pm.me>
+;
+; Managed by Ansible (roles/gitea) - local edits are overwritten.
+; Reference: https://docs.gitea.com/administration/config-cheat-sheet
+;
+; Values that may contain `#` or `;` are wrapped in backticks: Gitea's INI
+; parser treats both as the start of an inline comment, so an unquoted
+; `PASSWD = secret#2026` silently becomes `secret`.
+
+APP_NAME = `{{ gitea_app_name }}`
+RUN_USER = {{ gitea_user }}
+RUN_MODE = {{ gitea_run_mode }}
+WORK_PATH = {{ gitea_work_dir }}
+
+[server]
+PROTOCOL = http
+DOMAIN = {{ gitea_domain }}
+HTTP_ADDR = {{ gitea_http_addr }}
+HTTP_PORT = {{ gitea_http_port }}
+ROOT_URL = {{ gitea_root_url }}
+APP_DATA_PATH = {{ gitea_data_dir }}
+DISABLE_SSH = false
+START_SSH_SERVER = {{ gitea_start_ssh_server | lower }}
+BUILTIN_SSH_SERVER_USER = {{ gitea_user }}
+SSH_DOMAIN = {{ gitea_ssh_domain }}
+SSH_PORT = {{ gitea_ssh_port }}
+SSH_LISTEN_PORT = {{ gitea_ssh_port }}
+LFS_START_SERVER = true
+LFS_JWT_SECRET = `{{ gitea_secret_values['LFS_JWT_SECRET'] }}`
+OFFLINE_MODE = true
+
+[database]
+{% if gitea_db_type == "postgres" %}
+DB_TYPE = postgres
+HOST = {{ gitea_db_host }}
+NAME = {{ gitea_db_name }}
+USER = {{ gitea_db_user }}
+PASSWD = `{{ gitea_db_password }}`
+SSL_MODE = disable
+{% else %}
+DB_TYPE = sqlite3
+PATH = {{ gitea_data_dir }}/gitea.db
+SQLITE_JOURNAL_MODE = WAL
+{% endif %}
+LOG_SQL = false
+
+[repository]
+ROOT = {{ gitea_repository_root }}
+DEFAULT_BRANCH = main
+ENABLE_PUSH_CREATE_USER = true
+ENABLE_PUSH_CREATE_ORG = true
+
+[lfs]
+PATH = {{ gitea_lfs_dir }}
+
+[security]
+; Set up entirely by Ansible: the web installer must never run.
+INSTALL_LOCK = true
+SECRET_KEY = `{{ gitea_secret_values['SECRET_KEY'] }}`
+INTERNAL_TOKEN = `{{ gitea_secret_values['INTERNAL_TOKEN'] }}`
+PASSWORD_HASH_ALGO = pbkdf2
+
+[oauth2]
+JWT_SECRET = `{{ gitea_secret_values['JWT_SECRET'] }}`
+
+[service]
+DISABLE_REGISTRATION = {{ gitea_disable_registration | lower }}
+REQUIRE_SIGNIN_VIEW = {{ gitea_require_signin_view | lower }}
+REGISTER_EMAIL_CONFIRM = false
+ENABLE_NOTIFY_MAIL = false
+DEFAULT_KEEP_EMAIL_PRIVATE = true
+DEFAULT_ALLOW_CREATE_ORGANIZATION = true
+DEFAULT_ENABLE_TIMETRACKING = true
+
+[actions]
+ENABLED = {{ gitea_actions_enabled | lower }}
+DEFAULT_ACTIONS_URL = {{ gitea_actions_default_url }}
+
+[mailer]
+ENABLED = false
+
+[session]
+PROVIDER = file
+
+; Gravatar and federated avatars moved to the admin panel in Gitea 1.24;
+; setting them here only logs a deprecation. `[server] OFFLINE_MODE` above
+; already keeps the instance from reaching out for assets.
+
+[cron.update_checker]
+ENABLED = {{ gitea_update_checker | lower }}
+
+[log]
+MODE = console
+LEVEL = info
+ROOT_PATH = {{ gitea_log_dir }}
