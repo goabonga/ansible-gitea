@@ -1,0 +1,96 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+---
+
+# Release to install. The binary is fetched from dl.gitea.com and verified
+# against the published .sha256 file.
+gitea_version: "1.27.1"
+gitea_arch: amd64
+gitea_download_url: "https://dl.gitea.com/gitea/{{ gitea_version }}/gitea-{{ gitea_version }}-linux-{{ gitea_arch }}"
+# The checksum file names the versioned artefact, which is why the download
+# keeps that name on disk and /usr/local/bin/gitea is only a symlink.
+gitea_download_checksum: "sha256:{{ gitea_download_url }}.sha256"
+gitea_install_dir: /usr/local/lib/gitea
+gitea_binary: /usr/local/bin/gitea
+
+gitea_packages:
+  - git
+  - git-lfs
+  # setfacl, needed when Ansible becomes the unprivileged `git` account.
+  - acl
+
+# Service account and filesystem layout (upstream's recommended layout).
+gitea_user: git
+gitea_group: git
+gitea_home: /home/git
+gitea_config_dir: /etc/gitea
+gitea_config_file: /etc/gitea/app.ini
+gitea_work_dir: /var/lib/gitea
+gitea_data_dir: /var/lib/gitea/data
+gitea_repository_root: /var/lib/gitea/data/gitea-repositories
+gitea_lfs_dir: /var/lib/gitea/data/lfs
+gitea_log_dir: /var/log/gitea
+
+gitea_app_name: Gitea local lab
+gitea_run_mode: prod
+gitea_http_addr: 0.0.0.0
+gitea_http_port: 3000
+gitea_domain: "{{ ansible_host | default(inventory_hostname) }}"
+gitea_root_url: "http://{{ gitea_domain }}:{{ gitea_http_port }}/"
+
+# Gitea's built-in SSH server: no system account juggling, and it stays off
+# port 22 so the guest's own sshd keeps working.
+gitea_start_ssh_server: true
+gitea_ssh_domain: "{{ gitea_domain }}"
+gitea_ssh_port: 2222
+
+# `postgres` or `sqlite3`. PostgreSQL is installed on the guest itself.
+gitea_db_type: postgres
+gitea_db_host: 127.0.0.1:5432
+gitea_db_name: gitea
+gitea_db_user: gitea
+gitea_db_password: changeme
+gitea_db_packages:
+  - postgresql
+  - python3-psycopg2
+# Home of the `postgres` account on Debian and Ubuntu; only used to place the
+# Ansible temp directory the postgresql tasks need.
+gitea_db_user_home: /var/lib/postgresql
+
+# Instance administrator, created once through the CLI.
+gitea_admin_username: gitea-admin
+gitea_admin_password: changeme
+gitea_admin_email: gitea-admin@example.invalid
+
+# API endpoint used by the role itself; loopback needs no DNS.
+gitea_api_url: "http://127.0.0.1:{{ gitea_http_port }}"
+
+# Organisations created through the API once the administrator exists. Set
+# `gitea_organizations: []` to keep the instance empty.
+gitea_organizations_enabled: true
+gitea_organizations:
+  - username: lab
+    full_name: Lab
+    description: Working area for the local lab
+    visibility: private
+
+gitea_disable_registration: true
+gitea_require_signin_view: false
+# The lab has no outbound mail and is not meant to phone home.
+gitea_update_checker: false
+
+# Gitea Actions. `DEFAULT_ACTIONS_URL = github` lets workflows keep using
+# `uses: actions/checkout@v4` unchanged.
+gitea_actions_enabled: true
+gitea_actions_default_url: github
+# Registration token handed to the act_runner agents. It lives in the
+# Gitea-writable state directory, so the runners play can read it back.
+gitea_runner_token_file: /var/lib/gitea/runner-registration-token
+
+# Generated once and pinned in app.ini, so the config file can stay
+# read-only for the service account.
+gitea_secrets:
+  - SECRET_KEY
+  - INTERNAL_TOKEN
+  - JWT_SECRET
+  - LFS_JWT_SECRET

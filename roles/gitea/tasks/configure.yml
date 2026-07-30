@@ -1,0 +1,58 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+
+# Gitea normally writes its own secrets into app.ini on first start, which
+# forces the config file to be writable by the service account. Generating
+# them up front keeps app.ini root-owned and read-only for Gitea.
+---
+
+- name: Generate the Gitea secrets
+  ansible.builtin.shell:
+    cmd: >-
+      {{ gitea_binary }} generate secret {{ item }}
+      > {{ gitea_work_dir }}/.{{ item | lower }}
+    creates: "{{ gitea_work_dir }}/.{{ item | lower }}"
+  become: true
+  become_user: "{{ gitea_user }}"
+  loop: "{{ gitea_secrets }}"
+
+- name: Restrict the secret files
+  ansible.builtin.file:
+    path: "{{ gitea_work_dir }}/.{{ item | lower }}"
+    owner: "{{ gitea_user }}"
+    group: "{{ gitea_group }}"
+    mode: "0600"
+  loop: "{{ gitea_secrets }}"
+
+- name: Read the Gitea secrets
+  ansible.builtin.slurp:
+    src: "{{ gitea_work_dir }}/.{{ item | lower }}"
+  loop: "{{ gitea_secrets }}"
+  register: gitea_secret_files
+  no_log: true
+
+- name: Assemble the secret map
+  ansible.builtin.set_fact:
+    gitea_secret_values: >-
+      {{
+        dict(
+          gitea_secrets
+          | zip(
+              gitea_secret_files.results
+              | map(attribute='content')
+              | map('b64decode')
+              | map('trim')
+            )
+        )
+      }}
+  no_log: true
+
+- name: Write app.ini
+  ansible.builtin.template:
+    src: app.ini.j2
+    dest: "{{ gitea_config_file }}"
+    owner: root
+    group: "{{ gitea_group }}"
+    mode: "0640"
+  no_log: true
+  notify: Restart gitea

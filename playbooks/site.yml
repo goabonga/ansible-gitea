@@ -14,3 +14,6 @@
 
 - name: Provision the lab guests
   ansible.builtin.import_playbook: provision.yml
+
+- name: Deploy Gitea
+  ansible.builtin.import_playbook: gitea.yml

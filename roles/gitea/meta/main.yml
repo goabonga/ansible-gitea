@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+---
+
+galaxy_info:
+  role_name: gitea
+  namespace: goabonga
+  author: Chris
+  description: Install Gitea from the upstream binary with systemd and PostgreSQL.
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - noble
+    - name: Debian
+      versions:
+        - bookworm
+
+dependencies: []

@@ -6,19 +6,20 @@
 [![Ansible](https://img.shields.io/badge/ansible--core-%E2%89%A5%202.18-blue.svg)](https://docs.ansible.com/)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 
-Ansible project that builds **disposable KVM/QEMU guests on your own
-workstation**: an isolated libvirt network, a dedicated SSH key, and guests
-booted from an Ubuntu cloud image with cloud-init. Everything is installed
-natively — `systemctl status` behaves the way you expect on a normal server.
+Ansible project that brings up a **self-hosted Gitea on your own
+workstation**: a KVM/QEMU guest on an isolated libvirt network, running Gitea
+and PostgreSQL under systemd. No GitHub, no cloud, no account.
 
 ```text
    workstation (libvirt / qemu:///system)
    ├── network gitea-lab  192.168.170.0/24  NAT
-   └── (guests declared in inventory/local.yml)
+   └── gitea-server    192.168.170.10   Gitea 1.27 + PostgreSQL (systemd)
+                                        http :3000   ssh :2222
 ```
 
-This is the reusable skeleton: the host preparation and the guest factory. The
-guests themselves, and what runs on them, come from the inventory.
+Everything is installed natively from upstream binaries — no container to
+build, `systemctl status gitea` behaves the way you expect on a normal
+server.
 
 ## Requirements
 
@@ -48,27 +49,32 @@ The sudo password is only used on the workstation (packages, libvirt, guest
 disks); the guests themselves are driven with a passwordless key that the
 first play generates in `~/.local/share/ansible-gitea/`.
 
-## Declaring a guest
+Roughly ten minutes later:
 
-Add it to the `lab` group and run `provision.yml`. The address is applied by
-cloud-init, so it only has to be inside the lab network and outside the DHCP
-range (`.100`–`.200`):
+| What | Where | Credentials |
+| --- | --- | --- |
+| Gitea web UI | <http://192.168.170.10:3000/> | `gitea-admin` / `GiteaLab#2026` |
+| Git over SSH | `ssh://git@192.168.170.10:2222/<owner>/<repo>.git` | your lab key |
+| Organisation | <http://192.168.170.10:3000/lab> | owned by the admin |
+
+Those credentials are lab defaults sitting in
+`inventory/group_vars/gitea.yml`. Change them there (or in a vault) before the
+guest is reachable by anyone but you.
+
+An organisation named `lab` is created on the first deployment, because
+repositories under an organisation get their own Actions secrets and runner
+scope. Add your own, or empty the list to keep the instance bare:
 
 ```yaml
-# inventory/local.yml
-lab:
-  children:
-    web:
-      hosts:
-        web-1:
-          vm_ip: 192.168.170.10
-          vm_mac: "52:54:00:17:0a:0a"
-          vm_memory_mb: 2048
-          vm_vcpus: 2
-          vm_disk_size: 20G
+# inventory/group_vars/gitea.yml
+gitea_organizations:
+  - username: lab
+    full_name: Lab
+    description: Working area for the local lab
+    visibility: private   # or public
 ```
 
-Each guest boots a thin qcow2 overlay on the shared base image, so a new one
+Each guest boots a thin qcow2 overlay on the shared base image, so adding one
 costs seconds and a few MiB.
 
 ## Playbooks
@@ -78,7 +84,14 @@ costs seconds and a few MiB.
 | `playbooks/site.yml` | The whole lab, in order |
 | `playbooks/kvm-host.yml` | Workstation: packages, libvirt, lab keypair, NAT network |
 | `playbooks/provision.yml` | Creates the guests and waits for cloud-init |
+| `playbooks/gitea.yml` | PostgreSQL, Gitea, admin user, organisations |
 | `playbooks/destroy.yml` | Removes the guests, their disks and their seeds |
+
+Each play is independent, so a change to Gitea alone is:
+
+```bash
+uv run ansible-playbook playbooks/gitea.yml
+```
 
 Rebuild from scratch (the base cloud image is kept, so it takes seconds):
 
@@ -97,6 +110,7 @@ Everything lives in the inventory; the roles only hold defaults.
 | --- | --- |
 | `inventory/local.yml` | Guests: sizing, addresses, groups |
 | `inventory/group_vars/all.yml` | Network plan, base image, lab paths |
+| `inventory/group_vars/gitea.yml` | Gitea version, ports, credentials, organisations |
 
 **Different image** — point `lab_image_url` and `lab_image_checksum_url` at
 another cloud image; anything cloud-init based and Debian-flavoured works.
@@ -116,7 +130,8 @@ ansible-gitea/
 ├── playbooks/
 ├── roles/
 │   ├── kvm_host/              # libvirt, lab keypair, NAT network
-│   └── vm/                    # cloud image overlay + NoCloud seed + domain
+│   ├── vm/                    # cloud image overlay + NoCloud seed + domain
+│   └── gitea/                 # binary, PostgreSQL, app.ini, systemd, admin
 ├── requirements.yml           # Galaxy collections
 └── multicz.toml               # versioning and changelog
 ```

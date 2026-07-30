@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+
+# Versioned binaries side by side plus a symlink: upgrading is a variable
+# change, and rolling back is repointing the symlink.
+---
+
+- name: Create the Gitea binary directory
+  ansible.builtin.file:
+    path: "{{ gitea_install_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Download the Gitea binary
+  ansible.builtin.get_url:
+    url: "{{ gitea_download_url }}"
+    dest: "{{ gitea_install_dir }}/{{ gitea_download_url | basename }}"
+    checksum: "{{ gitea_download_checksum }}"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Link the Gitea binary into the path
+  ansible.builtin.file:
+    src: "{{ gitea_install_dir }}/{{ gitea_download_url | basename }}"
+    dest: "{{ gitea_binary }}"
+    state: link
+    owner: root
+    group: root
+  notify: Restart gitea
