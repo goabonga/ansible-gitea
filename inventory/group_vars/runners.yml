@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+
+# Gitea Actions agents. `act_runner_count` agents run on each host of the
+# group, so job concurrency is raised without provisioning another VM.
+---
+
+act_runner_version: "2.3.0"
+act_runner_count: 2
+# Follows whatever Gitea publishes as its root URL, so the agents move to
+# https://gitea.internal with it when the services stack is enabled.
+act_runner_instance_url: "{{ hostvars[lab_gitea_host].gitea_root_url | trim }}"
+# `label:docker://image` runs the job in a container; `label:host` runs it
+# straight on the VM. The ubuntu-* images mirror what GitHub-hosted runners
+# provide, so workflows copied from GitHub mostly work unchanged.
+act_runner_labels:
+  - "ubuntu-latest:docker://catthehacker/ubuntu:act-24.04"
+  - "ubuntu-24.04:docker://catthehacker/ubuntu:act-24.04"
+  - "ubuntu-22.04:docker://catthehacker/ubuntu:act-22.04"
+  - "self-hosted:host"

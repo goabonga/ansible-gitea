@@ -1,0 +1,179 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+
+# Installs `act_runner_count` Gitea Actions agents on the guest. Each agent
+# is a systemd instance (act_runner@<name>) with its own state directory and
+# its own registration against the Gitea instance.
+---
+
+- name: Check that the registration details are set
+  ansible.builtin.assert:
+    that:
+      - act_runner_instance_url | length > 0
+      - act_runner_registration_token | length > 0
+    fail_msg: >-
+      act_runner_instance_url and act_runner_registration_token are required.
+      Run `playbooks/gitea.yml` first: it mints the token that
+      `playbooks/runners.yml` passes to this role.
+
+- name: Install Docker and the agent prerequisites
+  ansible.builtin.apt:
+    name: "{{ act_runner_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Ensure Docker is running
+  ansible.builtin.systemd_service:
+    name: "{{ act_runner_docker_service }}"
+    state: started
+    enabled: true
+
+- name: Create the agent group
+  ansible.builtin.group:
+    name: "{{ act_runner_group }}"
+    system: true
+    state: present
+
+- name: Create the agent service account
+  ansible.builtin.user:
+    name: "{{ act_runner_user }}"
+    group: "{{ act_runner_group }}"
+    groups:
+      - docker
+    append: true
+    home: "{{ act_runner_home }}"
+    shell: /usr/sbin/nologin
+    comment: Gitea Actions agent
+    system: true
+    create_home: true
+    state: present
+
+- name: Create the agent directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ act_runner_user }}"
+    group: "{{ act_runner_group }}"
+    mode: "0750"
+  loop: "{{ [act_runner_home] + act_runner_instance_dirs }}"
+
+# Ansible drops the module payload of every `become_user: act` task in that
+# user's ~/.ansible/tmp — the registration below is one. Creating it here, with
+# the right ownership, keeps the "remote_tmp did not exist" warning out of the
+# first run.
+- name: Create the Ansible temp directory of the agent user
+  ansible.builtin.file:
+    path: "{{ act_runner_home }}/.ansible/tmp"
+    state: directory
+    owner: "{{ act_runner_user }}"
+    group: "{{ act_runner_group }}"
+    mode: "0700"
+
+- name: Create the agent configuration directory
+  ansible.builtin.file:
+    path: "{{ act_runner_config_dir }}"
+    state: directory
+    owner: root
+    group: "{{ act_runner_group }}"
+    mode: "0750"
+
+- name: Install the agent binary directory
+  ansible.builtin.file:
+    path: "{{ act_runner_install_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Download the agent binary
+  ansible.builtin.get_url:
+    url: "{{ act_runner_download_url }}"
+    dest: "{{ act_runner_install_dir }}/{{ act_runner_download_url | basename }}"
+    checksum: "{{ act_runner_download_checksum }}"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Link the agent binary into the path
+  ansible.builtin.file:
+    src: "{{ act_runner_install_dir }}/{{ act_runner_download_url | basename }}"
+    dest: "{{ act_runner_binary }}"
+    state: link
+    owner: root
+    group: root
+  notify: Restart the act_runner agents
+
+- name: Write the agent configuration
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: "{{ act_runner_config_file }}"
+    owner: root
+    group: "{{ act_runner_group }}"
+    mode: "0640"
+  notify: Restart the act_runner agents
+
+- name: Install the act_runner systemd template unit
+  ansible.builtin.template:
+    src: act_runner@.service.j2
+    dest: /etc/systemd/system/act_runner@.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart the act_runner agents
+
+# A registration is tied to the instance URL it was made against, so switching
+# Gitea from http://<ip>:3000 to https://gitea.internal (or back) has to drop
+# the stale ones — otherwise the agents keep polling an address that no longer
+# answers.
+- name: Look for existing agent registrations
+  ansible.builtin.stat:
+    path: "{{ act_runner_home }}/{{ item }}/.runner"
+  loop: "{{ act_runner_instance_names }}"
+  register: act_runner_registrations
+
+- name: Read the existing agent registrations
+  ansible.builtin.slurp:
+    src: "{{ item.stat.path }}"
+  loop: "{{ act_runner_registrations.results }}"
+  when: item.stat.exists
+  register: act_runner_registration_files
+  loop_control:
+    label: "{{ item.item }}"
+  no_log: true
+
+- name: Drop registrations pointing at another instance
+  ansible.builtin.file:
+    path: "{{ item.item.stat.path }}"
+    state: absent
+  loop: "{{ act_runner_registration_files.results }}"
+  when:
+    - not item.skipped | default(false)
+    - (item.content | b64decode | from_json).address | default('') != act_runner_instance_url
+  loop_control:
+    label: "{{ item.item.item }}"
+  notify: Restart the act_runner agents
+
+- name: Register the agents against Gitea
+  ansible.builtin.command:
+    cmd: >-
+      {{ act_runner_binary }} --config {{ act_runner_config_file }}
+      register --no-interactive
+      --instance {{ act_runner_instance_url }}
+      --token {{ act_runner_registration_token }}
+      --name {{ item }}
+      --labels {{ act_runner_labels | join(',') }}
+    chdir: "{{ act_runner_home }}/{{ item }}"
+    creates: "{{ act_runner_home }}/{{ item }}/.runner"
+  become: true
+  become_user: "{{ act_runner_user }}"
+  loop: "{{ act_runner_instance_names }}"
+  no_log: true
+
+- name: Enable and start the agents
+  ansible.builtin.systemd_service:
+    name: "act_runner@{{ item }}"
+    state: started
+    enabled: true
+    daemon_reload: true
+  loop: "{{ act_runner_instance_names }}"

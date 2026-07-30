@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+---
+
+# Derived from act_runner_count; the systemd instance name doubles as the
+# runner name shown in Gitea and as its state directory.
+act_runner_instance_names: >-
+  {{
+    range(1, (act_runner_count | int) + 1)
+    | map('regex_replace', '^(.*)$', act_runner_name_prefix ~ '-\1')
+    | list
+  }}
+act_runner_instance_dirs: >-
+  {{
+    act_runner_instance_names
+    | map('regex_replace', '^(.*)$', act_runner_home ~ '/\1')
+    | list
+  }}

@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+#
+# Managed by Ansible (roles/act_runner) - local edits are overwritten.
+# Shared by every agent on this host: `runner.file` is relative to the
+# systemd instance's working directory, so each agent still reads its own
+# registration. Reference: https://docs.gitea.com/usage/actions/act-runner
+---
+
+log:
+  level: {{ act_runner_log_level }}
+
+runner:
+  file: .runner
+  capacity: {{ act_runner_capacity }}
+  timeout: {{ act_runner_job_timeout }}
+  insecure: false
+  fetch_timeout: {{ act_runner_fetch_timeout }}
+  fetch_interval: {{ act_runner_fetch_interval }}
+  labels:
+{% for label in act_runner_labels %}
+    - "{{ label }}"
+{% endfor %}
+
+cache:
+  enabled: {{ act_runner_cache_enabled | lower }}
+  dir: ""
+  host: ""
+  # 0 lets each agent bind a free port instead of fighting over one.
+  port: {{ act_runner_cache_port }}
+
+container:
+  network: "{{ act_runner_container_network }}"
+  privileged: {{ act_runner_container_privileged | lower }}
+  options:
+  workdir_parent:
+  valid_volumes:
+{% for volume in act_runner_container_valid_volumes %}
+    - "{{ volume }}"
+{% endfor %}
+  docker_host: "-"
+  force_pull: false
+
+host:
+  workdir_parent:

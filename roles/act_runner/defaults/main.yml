@@ -1,0 +1,58 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+---
+
+# Upstream renamed the artefact to `gitea-runner` in the 2.x line; the
+# command-line interface is still act_runner's.
+act_runner_version: "2.3.0"
+act_runner_arch: amd64
+act_runner_release_base: https://dl.gitea.com/gitea-runner
+act_runner_artifact: "gitea-runner-{{ act_runner_version }}-linux-{{ act_runner_arch }}"
+act_runner_download_url: "{{ act_runner_release_base }}/{{ act_runner_version }}/{{ act_runner_artifact }}"
+act_runner_download_checksum: "sha256:{{ act_runner_download_url }}.sha256"
+act_runner_install_dir: /usr/local/lib/act_runner
+act_runner_binary: /usr/local/bin/act_runner
+
+# Jobs run in containers, so the agents need a Docker daemon and membership
+# of the docker group.
+act_runner_packages:
+  - docker.io
+  - git
+  # setfacl, needed when Ansible becomes the unprivileged agent account.
+  - acl
+act_runner_docker_service: docker
+
+act_runner_user: act
+act_runner_group: act
+act_runner_home: /var/lib/act_runner
+act_runner_config_dir: /etc/act_runner
+act_runner_config_file: /etc/act_runner/config.yaml
+
+# Number of agents on this host. Each one is a systemd instance with its own
+# state directory and its own registration, so `act_runner_count: 2` gives
+# two jobs running side by side.
+act_runner_count: 2
+act_runner_name_prefix: "{{ inventory_hostname }}"
+
+# Set by playbooks/runners.yml from the token minted by the gitea role.
+act_runner_instance_url: ""
+act_runner_registration_token: ""
+
+act_runner_labels:
+  - "ubuntu-latest:docker://catthehacker/ubuntu:act-24.04"
+  - "self-hosted:host"
+
+act_runner_log_level: info
+# Jobs per agent. Kept at 1: concurrency comes from `act_runner_count`, so a
+# stuck job cannot starve its siblings.
+act_runner_capacity: 1
+act_runner_job_timeout: 3h
+act_runner_fetch_timeout: 5s
+act_runner_fetch_interval: 2s
+# Local action cache; port 0 means "pick a free one", which is what lets
+# several agents share the same config file.
+act_runner_cache_enabled: true
+act_runner_cache_port: 0
+act_runner_container_network: ""
+act_runner_container_privileged: false
+act_runner_container_valid_volumes: []

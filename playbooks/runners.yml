@@ -1,0 +1,56 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+
+# Installs the Gitea Actions agents. The registration token is read straight
+# from the Gitea guest, so this playbook also works on its own once
+# `gitea.yml` has run.
+---
+
+- name: Deploy the Gitea Actions agents
+  hosts: runners
+  become: true
+  gather_facts: true
+  vars:
+    act_runner_registration_token: "{{ runners_registration_token }}"
+
+  pre_tasks:
+    - name: Look for the registration token on the Gitea guest
+      delegate_to: "{{ lab_gitea_host }}"
+      become: true
+      ansible.builtin.stat:
+        path: "{{ hostvars[lab_gitea_host].gitea_runner_token_file }}"
+      register: runners_token_stat
+
+    - name: Check that Gitea has already minted a registration token
+      ansible.builtin.assert:
+        that:
+          - runners_token_stat.stat.exists
+        fail_msg: >-
+          No registration token on {{ lab_gitea_host }}. Run
+          `ansible-playbook playbooks/gitea.yml` first.
+
+    - name: Read the registration token
+      delegate_to: "{{ lab_gitea_host }}"
+      become: true
+      ansible.builtin.slurp:
+        src: "{{ hostvars[lab_gitea_host].gitea_runner_token_file }}"
+      register: runners_token_file
+      no_log: true
+
+    - name: Keep the registration token for the role
+      ansible.builtin.set_fact:
+        runners_registration_token: "{{ runners_token_file.content | b64decode | trim }}"
+      no_log: true
+
+  roles:
+    - role: act_runner
+
+  post_tasks:
+    - name: Show the registered agents
+      ansible.builtin.debug:
+        msg:
+          - "{{ act_runner_count }} agent(s) registered from {{ inventory_hostname }}:"
+          - "{{ act_runner_instance_names | join(', ') }}"
+          - >-
+            Check them under
+            {{ act_runner_instance_url | regex_replace('/$', '') }}/-/admin/actions/runners
