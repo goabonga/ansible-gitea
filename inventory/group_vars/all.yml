@@ -37,3 +37,21 @@ lab_timezone: Etc/UTC
 
 # The guest hosting Gitea; runners derive their instance URL from it.
 lab_gitea_host: gitea-server
+
+# --- Internal domain ------------------------------------------------------
+# Serves `*.internal` from a dnsmasq running on the Gitea guest, so the lab is
+# reachable by name instead of by address.
+#
+# Set this to false for a plain address-based lab; everything below then turns
+# itself off and playbooks/services.yml becomes a no-op.
+lab_services_enabled: true
+# Where the internal services run. Every reference goes through this, so
+# moving them to a dedicated guest later is a one-line change.
+lab_services_host: "{{ lab_gitea_host }}"
+
+lab_dnsmasq_enabled: "{{ lab_services_enabled | bool }}"
+
+# `.internal` is reserved by ICANN for private use, so it can never collide
+# with a real domain.
+lab_internal_domain: internal
+lab_gitea_fqdn: "gitea.{{ lab_internal_domain }}"

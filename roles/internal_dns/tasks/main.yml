@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+
+# dnsmasq answering for the lab domain, so Gitea is reachable by name from the
+# workstation, from the other guests and from VPN clients.
+---
+
+- name: Install dnsmasq
+  ansible.builtin.apt:
+    name: "{{ internal_dns_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Write the lab DNS configuration
+  ansible.builtin.template:
+    src: lab-internal.conf.j2
+    dest: "{{ internal_dns_config }}"
+    owner: root
+    group: root
+    mode: "0644"
+    validate: dnsmasq --test --conf-file=%s
+  register: internal_dns_config_state
+
+# Restarted inline rather than through a handler: this role is included
+# mid-play, where `meta: flush_handlers` would also fire the surrounding role's
+# pending notifications. The check below needs the records to be live already.
+- name: Enable and start dnsmasq
+  ansible.builtin.systemd_service:
+    name: dnsmasq
+    state: "{{ 'restarted' if internal_dns_config_state is changed else 'started' }}"
+    enabled: true
+
+# Queries dnsmasq directly: the guest's own stub resolver is only pointed at
+# it later, by the resolver play in playbooks/services.yml.
+- name: Check that the lab domain resolves to the right addresses
+  ansible.builtin.command:
+    cmd: "dig +short @127.0.0.1 {{ item.name }}"
+  register: internal_dns_check
+  changed_when: false
+  failed_when: internal_dns_check.stdout | trim != item.ip
+  loop: "{{ internal_dns_records }}"
+  loop_control:
+    label: "{{ item.name }} -> {{ item.ip }}"

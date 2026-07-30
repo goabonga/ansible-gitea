@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+#
+# Managed by Ansible (roles/internal_dns) - local edits are overwritten.
+
+# Only answer on the addresses we own; systemd-resolved keeps 127.0.0.53.
+bind-interfaces
+{% for address in internal_dns_listen_addresses %}
+listen-address={{ address }}
+{% endfor %}
+
+# Never read /etc/resolv.conf (which points back at the stub resolver) and
+# forward anything outside the lab domain to the upstream servers.
+no-resolv
+no-poll
+{% for server in internal_dns_upstream %}
+server={{ server }}
+{% endfor %}
+
+# The lab domain is authoritative here, so a miss answers NXDOMAIN instead of
+# leaking the query upstream.
+local=/{{ internal_dns_domain }}/
+domain={{ internal_dns_domain }}
+expand-hosts
+
+{% for record in internal_dns_records %}
+host-record={{ record.name }},{{ record.ip }}
+{% endfor %}
+
+# No DHCP here: libvirt already serves the lab bridge.
+no-dhcp-interface=
+
+domain-needed
+bogus-priv
+cache-size=1000

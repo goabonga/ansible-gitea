@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Chris <goabonga@pm.me>
+
+# The lab's internal services. They run on the Gitea guest — daemons that sit
+# idle most of the time, on ports nothing else uses.
+#
+# Skipped entirely unless `lab_services_enabled` is true.
+---
+
+- name: Deploy the internal services
+  hosts: gitea
+  become: true
+  # Deferred on purpose: gathering facts at play level would connect — and
+  # fail as unreachable on a lab that is not up — before the condition below
+  # gets a chance to make this playbook the no-op it should be.
+  gather_facts: false
+  tasks:
+    - name: Set up the internal domain
+      when: lab_services_enabled | bool
+      block:
+        - name: Gather the guest facts
+          ansible.builtin.setup:
+
+        - name: Run the internal resolver
+          ansible.builtin.include_role:
+            name: internal_dns
+          when: lab_dnsmasq_enabled | bool
+          tags:
+            - dnsmasq
