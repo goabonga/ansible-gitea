@@ -1,0 +1,24 @@
+; SPDX-License-Identifier: MIT
+; Copyright (c) 2026 Chris <goabonga@pm.me>
+;
+; Managed by Ansible (roles/act_runner) - local edits are overwritten.
+; One instance per agent: `systemctl status act_runner@<name>`.
+[Unit]
+Description=Gitea Actions agent %i
+After=network-online.target {{ act_runner_docker_service }}.service
+Wants=network-online.target
+Requires={{ act_runner_docker_service }}.service
+
+[Service]
+Type=simple
+User={{ act_runner_user }}
+Group={{ act_runner_group }}
+WorkingDirectory={{ act_runner_home }}/%i
+ExecStart={{ act_runner_binary }} --config {{ act_runner_config_file }} daemon
+Restart=always
+RestartSec=5s
+Environment=HOME={{ act_runner_home }}/%i
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

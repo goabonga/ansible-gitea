@@ -17,3 +17,6 @@
 
 - name: Deploy Gitea
   ansible.builtin.import_playbook: gitea.yml
+
+- name: Deploy the Gitea Actions agents
+  ansible.builtin.import_playbook: runners.yml

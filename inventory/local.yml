@@ -27,3 +27,15 @@ all:
               vm_memory_mb: 2048
               vm_vcpus: 2
               vm_disk_size: 20G
+
+        runners:
+          hosts:
+            gitea-runner-1:
+              vm_ip: 192.168.170.11
+              vm_mac: "52:54:00:17:0a:0b"
+              vm_memory_mb: 2048
+              vm_vcpus: 2
+              vm_disk_size: 20G
+            # Add more runner hosts here (next free address: 192.168.170.12,
+            # MAC 52:54:00:17:0a:0c). Each host runs `act_runner_count`
+            # agents, so a single VM is usually enough for local work.

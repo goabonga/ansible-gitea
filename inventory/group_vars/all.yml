@@ -34,3 +34,6 @@ lab_image_checksum_url: https://cloud-images.ubuntu.com/noble/current/SHA256SUMS
 lab_vm_user: ubuntu
 lab_ssh_key_path: "{{ lab_state_dir }}/id_ed25519"
 lab_timezone: Etc/UTC
+
+# The guest hosting Gitea; runners derive their instance URL from it.
+lab_gitea_host: gitea-server

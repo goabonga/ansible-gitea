@@ -21,3 +21,4 @@ mock_roles:
   - kvm_host
   - vm
   - gitea
+  - act_runner
