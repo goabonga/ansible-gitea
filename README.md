@@ -1,10 +1,19 @@
-# ansible-gitea
+<h1 align="center">
+  <img src="assets/ansible-gitea.svg" alt="ansible-gitea" width="120" /><br/>
+  ansible-gitea
+</h1>
 
-[![CI](https://github.com/goabonga/ansible-gitea/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/goabonga/ansible-gitea/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/goabonga/ansible-gitea.svg)](https://github.com/goabonga/ansible-gitea/releases/latest)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/goabonga/ansible-gitea/blob/main/LICENSE)
-[![Ansible](https://img.shields.io/badge/ansible--core-%E2%89%A5%202.18-blue.svg)](https://docs.ansible.com/)
-[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
+<p align="center">
+  <em>A self-hosted Gitea lab with its own Actions runners, on your workstation.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/goabonga/ansible-gitea/actions/workflows/ci.yml"><img src="https://github.com/goabonga/ansible-gitea/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"/></a>
+  <a href="https://github.com/goabonga/ansible-gitea/releases/latest"><img src="https://img.shields.io/github/v/release/goabonga/ansible-gitea.svg" alt="Release"/></a>
+  <a href="https://github.com/goabonga/ansible-gitea/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"/></a>
+  <a href="https://docs.ansible.com/"><img src="https://img.shields.io/badge/ansible--core-%E2%89%A5%202.18-blue.svg" alt="Ansible"/></a>
+  <a href="https://github.com/astral-sh/uv"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json" alt="uv"/></a>
+</p>
 
 Ansible project that brings up a **self-hosted Gitea lab on your own
 workstation**: two KVM/QEMU guests on an isolated libvirt network, one running

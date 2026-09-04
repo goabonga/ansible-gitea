@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!--
+  SPDX-License-Identifier: MIT
+  Copyright (c) 2026 Chris <goabonga@pm.me>
+
+  ansible-gitea master logo.
+
+  The rounded shell is the isolated libvirt network the lab lives on.
+  Inside it sit the two guests the project brings up: the Gitea server
+  on top (status row) and the runner below (play mark), joined by the
+  link they talk over. The green is Gitea's own brand green.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- Rounded shell: the isolated lab network -->
+  <rect x="16" y="16" width="224" height="224" rx="52" fill="#3d6b17"/>
+  <rect x="34" y="34" width="188" height="188" rx="40" fill="#609926"/>
+  <!-- Link between the two guests -->
+  <line x1="128" y1="120" x2="128" y2="158" stroke="#3d6b17" stroke-width="12" stroke-linecap="round"/>
+  <!-- Gitea guest -->
+  <rect x="62" y="70" width="132" height="52" rx="14" fill="#FFFFFF"/>
+  <g fill="#609926">
+    <circle cx="90" cy="96" r="9"/>
+    <circle cx="118" cy="96" r="9"/>
+    <circle cx="146" cy="96" r="9"/>
+  </g>
+  <!-- Runner guest -->
+  <rect x="62" y="156" width="132" height="52" rx="14" fill="#C5E1A5"/>
+  <path d="M114 168 L114 196 L142 182 Z" fill="#3d6b17"/>
+</svg>
