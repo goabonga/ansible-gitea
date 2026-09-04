@@ -21,7 +21,7 @@ all:
     lab:
       children:
         # Also hosts the internal CA (step-ca) and resolver (dnsmasq) when the
-        # internal domain is enabled — no extra guest for two daemons that sit
+        # internal domain is enabled - no extra guest for two daemons that sit
         # idle most of the time.
         gitea:
           hosts:

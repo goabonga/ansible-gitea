@@ -2,7 +2,7 @@
 # Copyright (c) 2026 Chris <goabonga@pm.me>
 
 # The lab's internal services: a certificate authority (step-ca) and a resolver
-# for the lab domain (dnsmasq). Both run on the Gitea guest — two mostly idle
+# for the lab domain (dnsmasq). Both run on the Gitea guest - two mostly idle
 # daemons on ports nothing else uses (9000 and 53).
 #
 # Skipped entirely unless `lab_services_enabled` is true. It runs before
@@ -12,8 +12,8 @@
 - name: Deploy the internal services
   hosts: gitea
   become: true
-  # Deferred on purpose: gathering facts at play level would connect — and
-  # fail as unreachable on a lab that is not up — before the condition below
+  # Deferred on purpose: gathering facts at play level would connect - and
+  # fail as unreachable on a lab that is not up - before the condition below
   # gets a chance to make this playbook the no-op it should be.
   gather_facts: false
   tasks:

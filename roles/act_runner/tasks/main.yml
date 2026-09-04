@@ -59,7 +59,7 @@
   loop: "{{ [act_runner_home] + act_runner_instance_dirs }}"
 
 # Ansible drops the module payload of every `become_user: act` task in that
-# user's ~/.ansible/tmp — the registration below is one. Creating it here, with
+# user's ~/.ansible/tmp - the registration below is one. Creating it here, with
 # the right ownership, keeps the "remote_tmp did not exist" warning out of the
 # first run.
 - name: Create the Ansible temp directory of the agent user
@@ -124,7 +124,7 @@
 
 # A registration is tied to the instance URL it was made against, so switching
 # Gitea from http://<ip>:3000 to https://gitea.internal (or back) has to drop
-# the stale ones — otherwise the agents keep polling an address that no longer
+# the stale ones - otherwise the agents keep polling an address that no longer
 # answers.
 - name: Look for existing agent registrations
   ansible.builtin.stat:

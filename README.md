@@ -9,7 +9,7 @@
 Ansible project that brings up a **self-hosted Gitea lab on your own
 workstation**: two KVM/QEMU guests on an isolated libvirt network, one running
 Gitea, the other running Gitea Actions agents (`act_runner`). Push a repository
-with a `.gitea/workflows/` file and the jobs run locally — no GitHub, no cloud,
+with a `.gitea/workflows/` file and the jobs run locally - no GitHub, no cloud,
 no account.
 
 ```text
@@ -24,17 +24,17 @@ no account.
 The Gitea guest also runs the internal CA and resolver, which is what makes the
 lab reachable by name over TLS. Turn that off
 (`lab_services_enabled: false`) and the lab falls back to plain
-`http://192.168.170.10:3000` — see
+`http://192.168.170.10:3000` - see
 [Internal domain and TLS](#internal-domain-and-tls).
 
-Everything is installed natively from upstream binaries — no container to
+Everything is installed natively from upstream binaries - no container to
 build, `systemctl status gitea` and `journalctl -u 'act_runner@*'` behave the
 way you expect on a normal server.
 
 ## Requirements
 
 - A Linux workstation with hardware virtualisation (`/dev/kvm`) and `sudo`
-- [uv](https://docs.astral.sh/uv/) — it installs Ansible and the linters
+- [uv](https://docs.astral.sh/uv/) - it installs Ansible and the linters
 - About 6 GiB of RAM and 10 GiB of disk for the two guests
 - Internet access on the first run (cloud image, Gitea and runner binaries)
 
@@ -67,7 +67,7 @@ Roughly ten minutes later:
 | Gitea web UI | <https://gitea.internal/> | `gitea-admin` / `GiteaLab#2026` |
 | Git over HTTPS | `https://gitea.internal/<owner>/<repo>.git` | same |
 | Git over SSH | `ssh://git@gitea.internal:2222/<owner>/<repo>.git` | your lab key |
-| Runners | *Site administration → Actions → Runners* | — |
+| Runners | *Site administration → Actions → Runners* | - |
 | Organisation | <https://gitea.internal/lab> | owned by the admin |
 
 With `lab_services_enabled: false`, that is `http://192.168.170.10:3000/` and
@@ -149,7 +149,7 @@ writes two files outside its own guests:
 
 Kept on purpose: the lab SSH keypair, the base cloud image, and the libvirt
 network (unless you pass the flag above). A copy of the root certificate that
-*you* imported into a browser's own store has to be removed there by hand —
+*you* imported into a browser's own store has to be removed there by hand -
 `update-ca-certificates` does not reach into NSS profiles.
 
 ## Internal domain and TLS
@@ -162,7 +162,7 @@ environment. It is on in this inventory:
 lab_services_enabled: true   # false for a plain http lab
 ```
 
-Two daemons on the Gitea guest do the work — no extra VM, and no port that
+Two daemons on the Gitea guest do the work - no extra VM, and no port that
 Gitea or PostgreSQL already uses:
 
 | Piece | Where | What it gives you |
@@ -172,7 +172,7 @@ Gitea or PostgreSQL already uses:
 
 Gitea then serves **https://gitea.internal** on 443, the agents re-register
 against that URL by themselves, and the root certificate is added to the trust
-store of the guests and — unless you set `lab_configure_workstation: false` —
+store of the guests and - unless you set `lab_configure_workstation: false` -
 of the workstation, along with a systemd-resolved drop-in routing `~internal`
 to the lab. Both workstation changes are reverted by `playbooks/destroy.yml`.
 
@@ -181,8 +181,8 @@ to the lab. Both workstation changes are reverted by `playbooks/destroy.yml`.
 git clone https://gitea.internal/lab/my-repo.git
 ```
 
-Either piece can be switched off on its own — `lab_step_ca_enabled`,
-`lab_dnsmasq_enabled` — and each has its own tag:
+Either piece can be switched off on its own - `lab_step_ca_enabled`,
+`lab_dnsmasq_enabled` - and each has its own tag:
 
 ```bash
 uv run ansible-playbook playbooks/services.yml --tags dnsmasq
@@ -199,7 +199,7 @@ Worth knowing:
   the root *certificate* is fetched to the workstation.
 - **Moving the CA and resolver to their own guest** is a one-line change:
   point `lab_services_host` at another host of the `lab` group. Everything
-  else — the DNS records, the CA URL, the resolver drop-in — follows it.
+  else - the DNS records, the CA URL, the resolver drop-in - follows it.
 - Switching the stack on or off changes Gitea's URL, so existing clones need
   their remote updated.
 
@@ -216,9 +216,9 @@ Everything lives in the inventory; the roles only hold defaults.
 
 Two frequent ones:
 
-- **More job concurrency** — raise `act_runner_count` (agents on the existing
+- **More job concurrency** - raise `act_runner_count` (agents on the existing
   guest) or add a host to the `runners` group with a free address and MAC.
-- **Different image** — point `lab_image_url` and `lab_image_checksum_url` at
+- **Different image** - point `lab_image_url` and `lab_image_checksum_url` at
   another cloud image; anything cloud-init based and Debian-flavoured works.
 
 Guests get their address from cloud-init rather than DHCP, so adding one only

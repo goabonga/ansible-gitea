@@ -35,7 +35,7 @@ gitea_actions_enabled: true
 
 # Organisations created on first deployment. Repositories under an
 # organisation get their own Actions secrets and runner scope, which is the
-# usual shape for real work — set to [] for a bare instance.
+# usual shape for real work - set to [] for a bare instance.
 gitea_organizations:
   - username: lab
     full_name: Lab

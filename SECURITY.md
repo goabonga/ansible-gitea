@@ -36,7 +36,7 @@ defaults for that setting.
 
 In scope, and worth reporting:
 
-- the roles weakening the guests beyond what the lab requires — file modes,
+- the roles weakening the guests beyond what the lab requires - file modes,
   service hardening, sudo rules, secret generation and storage;
 - a template or task that leaks a secret into logs, into a world-readable
   file, or into the repository;
@@ -46,7 +46,7 @@ In scope, and worth reporting:
   network.
 
 Out of scope: the default passwords themselves, the absence of TLS inside the
-lab network, and Gitea's or act_runner's own vulnerabilities — report those
+lab network, and Gitea's or act_runner's own vulnerabilities - report those
 upstream (but do tell us, so the pinned versions can be bumped).
 
 Thanks for helping keep the project and its users safe.

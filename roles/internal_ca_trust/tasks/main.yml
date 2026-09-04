@@ -33,7 +33,7 @@
 
 # Deliberately not a handler. This role is included in the middle of another
 # role (roles/gitea/tasks/tls.yml), and `meta: flush_handlers` is global: it
-# would also fire that role's pending notifications — "Restart gitea" before
+# would also fire that role's pending notifications - "Restart gitea" before
 # the unit even exists. The trust store has to be usable before this role
 # returns, since the Gitea health check verifies the chain, so the update runs
 # inline.
